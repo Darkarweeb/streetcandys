@@ -81,7 +81,7 @@ function ProductosPageInner() {
   // Filters state — seed from URL on first render
   const [searchQuery, setSearchQuery] = useState(() => searchParams?.get('busqueda') ?? '');
   const [searchInput, setSearchInput] = useState(() => searchParams?.get('busqueda') ?? '');
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(() => searchParams?.get('categoria') ?? '');
   const [selectedEffects, setSelectedEffects] = useState<string[]>([]);
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
@@ -437,9 +437,14 @@ function ProductosPageInner() {
                 <ErrorState onRetry={fetchProducts} description={error} />
               ) : products.length === 0 ? (
                 <EmptyState
-                  title="Sin resultados"
+                  title={
+                    selectedCategory && !searchQuery && selectedEffects.length === 0 && !priceMin && !priceMax
+                      ? 'Próximamente' :'Sin resultados'
+                  }
                   description={
-                    hasActiveFilters
+                    selectedCategory && !searchQuery && selectedEffects.length === 0 && !priceMin && !priceMax
+                      ? 'Estamos trabajando para traerte productos en esta categoría. ¡Vuelve pronto!'
+                      : hasActiveFilters
                       ? 'No encontramos productos con los filtros seleccionados.'
                       : 'No hay productos disponibles en este momento.'
                   }
