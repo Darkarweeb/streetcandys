@@ -88,7 +88,7 @@ export default function FAQSection() {
           <div className="w-full lg:w-2/5">
             <div className="rounded-2xl overflow-hidden sticky top-24" style={{ aspectRatio: '3/4' }}>
               <img
-                src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&q=80"
+                src="https://images.unsplash.com/photo-1587920951705-5e2ddf954c49"
                 alt="Street Candy's product lineup displayed on a colorful background showing gummies, flower, and edibles"
                 className="w-full h-full object-cover" />
               

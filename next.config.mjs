@@ -64,6 +64,16 @@ const nextConfig = {
         ],
       },
       {
+        // HTML pages — must revalidate so browsers always get fresh chunk references
+        source: '/:path((?!_next/static|_next/image|assets|favicon\\.ico).*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+        ],
+      },
+      {
         source: '/favicon.ico',
         headers: [
           {
@@ -96,6 +106,17 @@ const nextConfig = {
           {
             key: 'Cache-Control',
             value: 'public, max-age=31536000, must-revalidate',
+          },
+        ],
+      },
+      {
+        // webpack runtime chunk — must come LAST to override the _next/static immutable rule above
+        // Prevents stale chunk errors when a new build is deployed
+        source: '/_next/static/chunks/webpack.js',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
           },
         ],
       },
