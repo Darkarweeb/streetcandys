@@ -28,11 +28,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://streetcandys.shop'),
   title: {
-    default: 'Street Candys | Premium Hemp-Derived Products',
+    default: 'Street Candys | Productos Derivados del Cáñamo',
     template: '%s | Street Candys',
   },
-  description: 'Premium Hemp-Derived Products. Learn, discover and shop trusted hemp products.',
-  keywords: ['hemp', 'CBD', 'hemp-derived', 'premium hemp products', 'Street Candys', 'hemp gummies', 'hemp oil', 'terpenes', 'cannabinoids'],
+  description: 'Descubre y compra productos de cáñamo premium y de confianza. Envíos a Colombia y Costa Rica.',
+  keywords: ['cáñamo', 'CBD', 'productos derivados del cáñamo', 'productos premium', 'Street Candys', 'gomitas de cáñamo', 'aceite de cáñamo', 'terpenos', 'cannabinoides', 'Colombia', 'Costa Rica'],
   applicationName: 'Street Candys',
   icons: {
     icon: [
@@ -46,28 +46,28 @@ export const metadata: Metadata = {
   },
   manifest: '/manifest.json',
   openGraph: {
-    title: 'Street Candys',
-    description: 'Premium Hemp-Derived Products. Learn, discover and shop trusted hemp products.',
+    title: 'Street Candys | Productos Derivados del Cáñamo',
+    description: 'Descubre y compra productos de cáñamo premium y de confianza. Envíos a Colombia y Costa Rica.',
     type: 'website',
     locale: 'es_CO',
     siteName: 'Street Candys',
     url: process.env.NEXT_PUBLIC_SITE_URL || 'https://streetcandys.shop',
     images: [
       {
-        url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://streetcandys.shop'}/assets/images/og-image-streetcandys-premium.png`,
+        url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://streetcandys.shop'}/assets/images/og-image-streetcandys-spanish.png`,
         width: 1200,
         height: 630,
-        alt: 'Street Candys — Premium Hemp-Derived Products',
+        alt: 'Street Candys — Productos Derivados del Cáñamo',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Street Candys',
-    description: 'Premium Hemp-Derived Products. Learn, discover and shop trusted hemp products.',
+    title: 'Street Candys | Productos Derivados del Cáñamo',
+    description: 'Descubre y compra productos de cáñamo premium y de confianza. Envíos a Colombia y Costa Rica.',
     creator: '@streetcandys',
     images: [
-      `${process.env.NEXT_PUBLIC_SITE_URL || 'https://streetcandys.shop'}/assets/images/og-image-streetcandys-premium.png`,
+      `${process.env.NEXT_PUBLIC_SITE_URL || 'https://streetcandys.shop'}/assets/images/og-image-streetcandys-spanish.png`,
     ],
   },
   alternates: {
