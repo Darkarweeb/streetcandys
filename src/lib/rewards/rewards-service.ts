@@ -12,7 +12,7 @@
  *  - Records every transaction with date, order_id, reason, and amount
  */
 
-import { createClient } from '../supabase/server';
+import { createAdminClient } from '../supabase/admin';
 import { loggerPagos } from '../payment/logger';
 
 // ── Point-rate configuration per country ──────────────────────────────────────
@@ -60,7 +60,8 @@ export async function otorgarPuntosPorCompra(
     };
   }
 
-  const supabase = await createClient();
+  // Use admin client (service role) to bypass RLS — rewards are awarded server-side only
+  const supabase = createAdminClient();
 
   try {
     // ── Upsert the rewards row (create if first order) ──────────────────────

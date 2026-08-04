@@ -69,26 +69,18 @@ function IniciarSesionForm() {
       const { data: { session } } = await supabase.auth.getSession();
       const userId = session?.user?.id;
 
-      console.log('[Login] session user.id:', userId ?? 'NULL — session not ready yet');
-
       if (userId) {
-        const { data: perfil, error: perfilError } = await supabase
+        const { data: perfil } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', userId)
           .single();
-
-        console.log('[Login] profile role from DB:', perfil?.role ?? 'null/undefined');
-        console.log('[Login] profiles query error:', perfilError?.message ?? 'none');
-        console.log('[Login] will redirect to:', (perfil?.role === 'admin' || perfil?.role === 'staff') ? '/admin' : nextPath);
 
         if (perfil?.role === 'admin' || perfil?.role === 'staff') {
           router.push('/admin');
           router.refresh();
           return;
         }
-      } else {
-        console.log('[Login] WARNING: session was null after signIn — falling back to nextPath redirect.');
       }
 
       router.push(nextPath);
