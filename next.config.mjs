@@ -64,6 +64,26 @@ const nextConfig = {
         ],
       },
       {
+        // HTML pages — must revalidate so browsers always get fresh chunk references
+        source: '/:path((?!_next/static|_next/image|assets|favicon\\.ico).*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+        ],
+      },
+      {
+        // webpack runtime chunk — never cache, always fetch fresh
+        source: '/_next/static/chunks/webpack.js',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+        ],
+      },
+      {
         source: '/favicon.ico',
         headers: [
           {

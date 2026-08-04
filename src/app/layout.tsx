@@ -127,6 +127,7 @@ export default function RootLayout({
             __html: `(function(){var _o=window.onerror;window.onerror=function(m,s,l,c,e){var ms=String(m||'');if(ms.indexOf('originalFactory.call')!==-1||ms.indexOf("reading 'call'")!==-1||ms.indexOf('Loading chunk')!==-1||ms.indexOf('ChunkLoadError')!==-1){try{if(window.caches){window.caches.keys().then(function(k){k.forEach(function(n){window.caches.delete(n);});});}}catch(ex){}window.location.reload();return true;}if(_o)return _o.apply(this,arguments);};})();`,
           }}
         />
+
         <script type="module" async src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Fstreetcand8616back.builtwithrocket.new&_be=https%3A%2F%2Fappanalytics.rocket.new&_v=0.1.20" />
         <script type="module" defer src="https://static.rocket.new/rocket-shot.js?v=0.0.2" /></head>
       <body className={dmSans.className}>
