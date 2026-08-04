@@ -86,13 +86,11 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Anonymous user — check if this email exists in auth and is confirmed
-      const { data: authData } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-      const matchedUser = authData?.users?.find(
-        (u) => u.email?.toLowerCase() === normalizedEmail
-      );
-      if (matchedUser) {
-        userId = matchedUser.id;
-        emailConfirmed = matchedUser.email_confirmed_at != null;
+      // Using getUserByEmail for O(1) scalable lookup (no pagination limit)
+      const { data: userData, error: userLookupError } = await adminClient.auth.admin.getUserByEmail(normalizedEmail);
+      if (!userLookupError && userData?.user) {
+        userId = userData.user.id;
+        emailConfirmed = userData.user.email_confirmed_at != null;
       }
     }
 
