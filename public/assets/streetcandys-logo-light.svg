@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 180" width="100%" height="100%">
+  <defs>
+    <!-- 
+      Custom Bold Urban Typography for "StreetCandy's"
+      Designed with heavy block structures and 45-degree chamfers 
+      to evoke a stencil/street-culture aesthetic.
+    -->
+  </defs>
+
+  <g id="street-candys-wordmark" fill="#163317" fill-rule="nonzero">
+    
+    <!-- ========================================== -->
+    <!-- "STREET" - Top Line (Heavy Weight)         -->
+    <!-- ========================================== -->
+    <g id="word-street">
+      <!-- S -->
+      <path d="M 80 27.5 H 40 L 30 37.5 V 65 H 65 V 72.5 H 30 V 87.5 H 70 L 80 77.5 V 50 H 45 V 42.5 H 80 Z" />
+      
+      <!-- T -->
+      <path d="M 90 27.5 H 140 V 42.5 H 122.5 V 77.5 L 112.5 87.5 H 107.5 V 42.5 H 90 Z" />
+      
+      <!-- R -->
+      <path d="M 150 27.5 H 190 L 200 37.5 V 55 L 190 65 H 180 L 200 87.5 H 182.5 L 165 65 V 87.5 H 150 Z 
+               M 165 42.5 V 50 H 185 V 42.5 Z" />
+      
+      <!-- E -->
+      <path d="M 210 27.5 H 245 L 255 37.5 V 42.5 H 225 V 50 H 245 V 65 H 225 V 72.5 H 255 V 77.5 L 245 87.5 H 210 Z" />
+      
+      <!-- E -->
+      <path d="M 265 27.5 H 300 L 310 37.5 V 42.5 H 280 V 50 H 300 V 65 H 280 V 72.5 H 310 V 77.5 L 300 87.5 H 265 Z" />
+      
+      <!-- T -->
+      <path d="M 320 27.5 H 370 V 42.5 H 352.5 V 77.5 L 342.5 87.5 H 337.5 V 42.5 H 320 Z" />
+    </g>
+
+    <!-- ========================================== -->
+    <!-- "CANDY'S" - Bottom Line (Slightly Thinner) -->
+    <!-- ========================================== -->
+    <g id="word-candys">
+      <!-- C -->
+      <path d="M 75 102.5 H 40 L 30 112.5 V 142.5 L 40 152.5 H 75 V 140.5 H 42 V 114.5 H 75 Z" />
+      
+      <!-- A -->
+      <path d="M 85 152.5 V 112.5 L 95 102.5 H 120 L 130 112.5 V 152.5 H 118 V 139.5 H 97 V 152.5 Z 
+               M 97 127.5 H 118 V 114.5 H 97 Z" />
+      
+      <!-- N -->
+      <path d="M 140 152.5 V 102.5 H 152 L 173 132.5 V 102.5 H 185 V 152.5 H 173 L 152 122.5 V 152.5 Z" />
+      
+      <!-- D -->
+      <path d="M 195 102.5 H 230 L 240 112.5 V 142.5 L 230 152.5 H 195 Z 
+               M 207 114.5 V 140.5 H 228 V 114.5 Z" />
+      
+      <!-- Y -->
+      <path d="M 250 102.5 H 262 V 120.5 H 283 V 102.5 H 295 V 132.5 H 278.5 V 152.5 H 266.5 V 132.5 H 250 Z" />
+      
+      <!-- ' (Apostrophe) -->
+      <path d="M 305 102.5 H 315 L 311 122.5 H 301 Z" />
+      
+      <!-- S -->
+      <path d="M 370 102.5 H 335 L 325 112.5 V 133.5 H 358 V 140.5 H 325 V 152.5 H 360 L 370 142.5 V 121.5 H 337 V 114.5 H 370 Z" />
+    </g>
+
+  </g>
+</svg>

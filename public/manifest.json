@@ -1,0 +1,74 @@
+{
+    "name": "StreetCandy's",
+    "short_name": "StreetCandy's",
+    "description": "Descubre las mejores gomitas, chocolates y dulces premium. Compra en línea y acumula recompensas en StreetCandy's.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#fff0f5",
+    "theme_color": "#e91e8c",
+    "orientation": "portrait-primary",
+    "scope": "/",
+    "lang": "es",
+    "icons": [
+        {
+            "src": "/assets/images/app-icon-streetcandys.png",
+            "sizes": "1024x1024",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/assets/images/app-icon-streetcandys.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/assets/images/app-icon-streetcandys.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/assets/streetcandys-favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/favicon.ico",
+            "sizes": "48x48",
+            "type": "image/x-icon"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Productos",
+            "short_name": "Productos",
+            "description": "Ver catálogo de productos",
+            "url": "/productos",
+            "icons": [
+                {
+                    "src": "/assets/images/app-icon-streetcandys.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Mi Cuenta",
+            "short_name": "Cuenta",
+            "description": "Acceder a mi cuenta",
+            "url": "/cuenta",
+            "icons": [
+                {
+                    "src": "/assets/images/app-icon-streetcandys.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ],
+    "categories": [
+        "shopping",
+        "lifestyle"
+    ],
+    "screenshots": []
+}

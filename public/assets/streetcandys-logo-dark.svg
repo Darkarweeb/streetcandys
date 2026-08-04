@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200" width="100%" height="100%">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="white-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#D0D0D0" />
+    </linearGradient>
+    
+    <linearGradient id="neon-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E0FF66" />
+      <stop offset="50%" stop-color="#C8FF00" />
+      <stop offset="100%" stop-color="#99CC00" />
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="neon-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur1" />
+      <feGaussianBlur stdDeviation="12" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="subtle-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.7"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Stencil Slice Mask -->
+    <mask id="text-slice">
+      <rect x="-50" y="-20" width="500" height="200" fill="white" />
+      <rect x="-50" y="28" width="500" height="4" fill="black" />
+      <rect x="-50" y="98" width="500" height="4" fill="black" />
+    </mask>
+
+    <!-- Custom Typography Paths (Grid: 45x60, Stem: 12) -->
+    <path id="L-S" d="M 45,12 L 12,12 L 12,24 L 45,24 L 45,60 L 0,60 L 0,48 L 33,48 L 33,36 L 0,36 L 0,0 L 45,0 Z" />
+    <path id="L-T" d="M 0,0 H 45 V 12 H 28.5 V 60 H 16.5 V 12 H 0 Z" />
+    <path id="L-R" d="M 0,0 H 45 V 36 H 28 L 45,60 H 29 L 14,36 H 12 V 60 H 0 Z M 12,12 H 33 V 24 H 12 Z" />
+    <path id="L-E" d="M 0,0 H 45 V 12 H 12 V 24 H 35 V 36 H 12 V 48 H 45 V 60 H 0 Z" />
+    <path id="L-C" d="M 45,0 V 12 H 12 V 48 H 45 V 60 H 0 V 0 Z" />
+    <path id="L-A" d="M 0,60 V 0 H 45 V 60 H 33 V 36 H 12 V 60 Z M 12,12 H 33 V 24 H 12 Z" />
+    <path id="L-N" d="M 0,0 H 12 L 33,42 V 0 H 45 V 60 H 33 L 12,18 V 60 H 0 Z" />
+    <path id="L-D" d="M 0,0 H 33 L 45,12 V 48 L 33,60 H 0 Z M 12,12 V 48 H 30 L 33,45 V 15 L 30,12 Z" />
+    <path id="L-Y" d="M 0,0 H 14 L 22.5,18 L 31,0 H 45 L 28.5,36 V 60 H 16.5 V 36 Z" />
+    <path id="L-AP" d="M 0,0 H 10 V 10 L 5,20 H 0 L 5,10 V 0 Z" />
+
+    <!-- Word Groups -->
+    <g id="street-text" fill-rule="evenodd">
+      <use href="#L-S" x="0" />
+      <use href="#L-T" x="59" />
+      <use href="#L-R" x="118" />
+      <use href="#L-E" x="177" />
+      <use href="#L-E" x="236" />
+      <use href="#L-T" x="295" />
+    </g>
+
+    <g id="candys-text" fill-rule="evenodd">
+      <use href="#L-C" x="0" />
+      <use href="#L-A" x="55" />
+      <use href="#L-N" x="110" />
+      <use href="#L-D" x="165" />
+      <use href="#L-Y" x="220" />
+      <use href="#L-AP" x="275" />
+      <use href="#L-S" x="295" />
+    </g>
+
+    <!-- Spark Accent -->
+    <path id="spark" d="M 0,-8 L 2,-2 L 8,0 L 2,2 L 0,8 L -2,2 L -8,0 L -2,-2 Z" />
+  </defs>
+
+  <!-- Background Accents (Floating Sparks) -->
+  <g id="sparks">
+    <use href="#spark" x="160" y="30" fill="#C8FF00" transform="scale(0.8) rotate(15 160 30)" filter="url(#subtle-glow)" />
+    <use href="#spark" x="550" y="150" fill="#FAFAFA" transform="scale(1.2) rotate(-10 550 150)" />
+    <use href="#spark" x="60" y="170" fill="#C8FF00" transform="scale(0.6) rotate(45 60 170)" filter="url(#subtle-glow)" />
+  </g>
+
+  <!-- Stylized Candy/Star Icon -->
+  <g id="icon" transform="translate(110, 100)">
+    <!-- Icon Hard Shadow -->
+    <g transform="translate(5, 5)">
+      <path d="M -20.78,-12 L -45,-25 L -35,-10 L -50,0 L -35,10 L -45,25 L -20.78,12 Z" fill="none" stroke="#0A1A00" stroke-width="6" stroke-linejoin="round" />
+      <path d="M 20.78,-12 L 45,-25 L 35,-10 L 50,0 L 35,10 L 45,25 L 20.78,12 Z" fill="none" stroke="#0A1A00" stroke-width="6" stroke-linejoin="round" />
+      <polygon points="0,-24 20.78,-12 20.78,12 0,24 -20.78,12 -20.78,-12" fill="#0A1A00" stroke="#0A1A00" stroke-width="6" stroke-linejoin="round" />
+    </g>
+
+    <!-- Candy Wrappers (White Outlines) -->
+    <path d="M -20.78,-12 L -45,-25 L -35,-10 L -50,0 L -35,10 L -45,25 L -20.78,12 Z" fill="none" stroke="url(#white-grad)" stroke-width="6" stroke-linejoin="round" />
+    <path d="M 20.78,-12 L 45,-25 L 35,-10 L 50,0 L 35,10 L 45,25 L 20.78,12 Z" fill="none" stroke="url(#white-grad)" stroke-width="6" stroke-linejoin="round" />
+    
+    <!-- Wrapper Speed Lines -->
+    <line x1="-35" y1="0" x2="-24" y2="0" stroke="url(#white-grad)" stroke-width="4" stroke-linecap="round" />
+    <line x1="35" y1="0" x2="24" y2="0" stroke="url(#white-grad)" stroke-width="4" stroke-linecap="round" />
+
+    <!-- Center Hexagon -->
+    <polygon points="0,-24 20.78,-12 20.78,12 0,24 -20.78,12 -20.78,-12" fill="#0D0D0D" stroke="url(#white-grad)" stroke-width="6" stroke-linejoin="round" />
+
+    <!-- Inner Neon Star -->
+    <path d="M 0,-16 L 4,-4 L 16,0 L 4,4 L 0,16 L -4,4 L -16,0 L -4,-4 Z" fill="#C8FF00" filter="url(#neon-glow)" />
+    <path d="M 0,-16 L 4,-4 L 16,0 L 4,4 L 0,16 L -4,4 L -16,0 L -4,-4 Z" fill="url(#neon-grad)" />
+    <circle cx="0" cy="0" r="2.5" fill="#FAFAFA" />
+  </g>
+
+  <!-- Wordmark -->
+  <g id="wordmark" transform="translate(200, 35) skewX(-12)">
+    
+    <!-- Hard Drop Shadows (Unmasked for depth) -->
+    <g transform="translate(5, 5)">
+      <use href="#street-text" fill="#0A1A00" stroke="#0A1A00" stroke-width="2" stroke-linejoin="round" />
+      <g transform="translate(0, 70)">
+        <use href="#candys-text" fill="#0A1A00" stroke="#0A1A00" stroke-width="2" stroke-linejoin="round" />
+      </g>
+    </g>
+
+    <!-- Ambient Neon Glow for CANDY'S -->
+    <g transform="translate(0, 70)" filter="url(#subtle-glow)">
+      <use href="#candys-text" fill="#C8FF00" />
+    </g>
+
+    <!-- Main Text Layer with Stencil Slice -->
+    <g mask="url(#text-slice)">
+      <!-- STREET -->
+      <use href="#street-text" fill="url(#white-grad)" stroke="url(#white-grad)" stroke-width="1.5" stroke-linejoin="round" />
+      
+      <!-- CANDY'S -->
+      <g transform="translate(0, 70)">
+        <use href="#candys-text" fill="url(#neon-grad)" stroke="url(#neon-grad)" stroke-width="1.5" stroke-linejoin="round" />
+      </g>
+    </g>
+
+  </g>
+</svg>

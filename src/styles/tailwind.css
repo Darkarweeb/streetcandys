@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: var(--font-dm-sans), 'DM Sans', Inter, ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+    /* Prevent horizontal overflow globally */
+    overflow-x: hidden;
+  }
+
+  body {
+    background-color: #FFFCF8;
+    color: #163317;
+    /* Prevent horizontal overflow globally */
+    overflow-x: hidden;
+    /* Support safe area insets for notched devices */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Improve tap highlight on mobile */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Ensure inputs don't zoom on iOS (font-size >= 16px) */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="search"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  *:focus-visible {
+    outline: 2px solid #4571CB;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tracking-tightest {
+    letter-spacing: -0.04em;
+  }
+}
