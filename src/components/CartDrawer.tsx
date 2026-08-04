@@ -30,6 +30,7 @@ function buildWhatsAppMessage(
   subtotal: number,
   country: Country,
   coupon?: string,
+  couponDiscount?: number,
 ): string {
   const countryLabel = country === 'CR' ? '🇨🇷 Costa Rica' : '🇨🇴 Colombia';
   const threshold = FREE_SHIPPING_THRESHOLD[country];
@@ -43,10 +44,14 @@ function buildWhatsAppMessage(
     })
     .join('\n');
 
-  const totalFormatted = formatPriceValue(subtotal, country);
+  const discount = couponDiscount ?? 0;
+  const finalTotal = Math.max(0, subtotal - discount);
+  const totalFormatted = formatPriceValue(finalTotal, country);
   const shippingNote =
     subtotal >= threshold ? '🚚 Envío gratis' : '🚚 Envío por calcular';
-  const couponLine = coupon ? `\n🏷️ Cupón aplicado: ${coupon}` : '';
+  const couponLine = coupon
+    ? `\n🏷️ Cupón: ${coupon}${discount > 0 ? ` (−${formatPriceValue(discount, country)})` : ''}`
+    : '';
 
   return (
     `Hola 👋, quiero finalizar mi pedido en Street Candy:\n\n` +
@@ -128,14 +133,20 @@ export default function CartDrawer({
         setCouponError(data.error ?? 'Cupón inválido.');
       } else {
         const cupon = data.datos?.cupon;
-        const descuento = data.datos?.resumen?.descuento_cupon ?? 0;
+        // Prefer server-calculated discount from resumen, fall back to cupon object
+        const descuento =
+          data.datos?.resumen?.descuento_cupon ??
+          cupon?.descuento_calculado ??
+          0;
         const tipo = cupon?.tipo_descuento ?? cupon?.discount_type ?? '';
         setAppliedCoupon({ code, discount: descuento, type: tipo });
         setCouponInput('');
-        setCouponSuccess(
+        const successMsg =
           tipo === 'shipping' ?'¡Cupón aplicado! Envío gratis en tu pedido.'
-            : `¡Cupón aplicado! Descuento: ${formatPriceValue(descuento, activeCountry)}`,
-        );
+            : `¡Cupón aplicado! Descuento: ${formatPriceValue(descuento, activeCountry)}`;
+        setCouponSuccess(successMsg);
+        // Clear success message after 4 seconds
+        setTimeout(() => setCouponSuccess(null), 4000);
       }
     } catch {
       setCouponError('Error al aplicar el cupón. Intenta de nuevo.');
@@ -205,7 +216,13 @@ export default function CartDrawer({
     availableItems.length > 0;
 
   const handleWhatsAppCheckout = () => {
-    const message = buildWhatsAppMessage(availableItems, subtotal, activeCountry, appliedCoupon?.code ?? coupon);
+    const message = buildWhatsAppMessage(
+      availableItems,
+      subtotal,
+      activeCountry,
+      appliedCoupon?.code ?? coupon,
+      couponDiscount,
+    );
     const encoded = encodeURIComponent(message);
     window.open(`https://wa.me/${settings.phone}?text=${encoded}`, '_blank', 'noopener,noreferrer');
   };
@@ -398,7 +415,7 @@ export default function CartDrawer({
               {couponError && (
                 <p className="text-red-500 text-xs mt-1.5 font-medium" role="alert">{couponError}</p>
               )}
-              {couponSuccess && !appliedCoupon && (
+              {couponSuccess && (
                 <p className="text-sc-green text-xs mt-1.5 font-medium">{couponSuccess}</p>
               )}
             </div>

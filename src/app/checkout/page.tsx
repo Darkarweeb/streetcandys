@@ -889,10 +889,15 @@ export default function CheckoutPage() {
         return;
       }
       const cupon = data.datos?.cupon ?? null;
+      // Prefer server-calculated discount from resumen, fall back to cupon object
+      const descuento =
+        data.datos?.resumen?.descuento_cupon ??
+        cupon?.descuento_calculado ??
+        0;
       setCoupon({
         code: cupon?.codigo ?? couponInput.trim(),
         type: cupon?.tipo_descuento ?? null,
-        discount: cupon?.descuento_calculado ?? 0,
+        discount: descuento,
         loading: false,
         error: null,
       });
