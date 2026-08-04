@@ -9,13 +9,17 @@ import AppLogo from '@/components/ui/AppLogo';
 function IniciarSesionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signIn, loading: authLoading } = useAuth();
+  const { signIn, resendConfirmationEmail, loading: authLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const nextPath = searchParams.get('next') || '/';
   const urlError = searchParams.get('error');
@@ -26,9 +30,36 @@ function IniciarSesionForm() {
     }
   }, [urlError]);
 
+  const startCooldown = () => {
+    setResendCooldown(60);
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) { clearInterval(interval); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleResend = async () => {
+    if (resendCooldown > 0 || resendLoading || !email) return;
+    setResendLoading(true);
+    setResendMessage('');
+    try {
+      await resendConfirmationEmail(email);
+      setResendMessage('✅ Correo reenviado. Revisa tu bandeja de entrada.');
+      startCooldown();
+    } catch {
+      setResendMessage('❌ No se pudo reenviar. Intenta en unos minutos.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setEmailNotConfirmed(false);
+    setResendMessage('');
     setLoading(true);
     try {
       await signIn(email, password);
@@ -63,7 +94,13 @@ function IniciarSesionForm() {
       router.push(nextPath);
       router.refresh();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al iniciar sesión.');
+      const msg = err instanceof Error ? err.message : 'Error al iniciar sesión.';
+      if (msg.includes('verificar tu correo') || msg.includes('Email not confirmed') || msg.includes('email_not_confirmed')) {
+        setEmailNotConfirmed(true);
+        setError('');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -104,9 +141,52 @@ function IniciarSesionForm() {
           <h1 className="text-2xl font-black text-center mb-1" style={{ color: '#1a1a1a' }}>Bienvenido de vuelta</h1>
           <p className="text-sm text-center mb-6" style={{ color: '#888' }}>Ingresa a tu cuenta para continuar.</p>
 
-          {error && (
+          {/* Generic error */}
+          {error && !emailNotConfirmed && (
             <div className="mb-5 p-4 rounded-xl text-sm" style={{ background: 'rgba(233,30,140,0.08)', border: '1px solid rgba(233,30,140,0.3)', color: '#c0006a' }}>
               {error}
+            </div>
+          )}
+
+          {/* Email not confirmed banner */}
+          {emailNotConfirmed && (
+            <div className="mb-5 rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(233,30,140,0.3)' }}>
+              <div className="px-4 py-3" style={{ background: 'linear-gradient(135deg, #e91e8c 0%, #ff69b4 100%)' }}>
+                <p className="text-sm font-bold text-white">📧 Confirma tu correo primero</p>
+              </div>
+              <div className="px-4 py-3" style={{ background: 'rgba(233,30,140,0.05)' }}>
+                <p className="text-xs mb-3" style={{ color: '#666' }}>
+                  Tu cuenta aún no está activada. Revisa tu bandeja de entrada
+                  {email && (
+                    <> en <span className="font-bold" style={{ color: '#e91e8c' }}>{email}</span></>
+                  )} y haz clic en el enlace de confirmación.
+                </p>
+                <p className="text-xs mb-3" style={{ color: '#888' }}>
+                  ¿No lo encuentras? Revisa tu carpeta de spam o solicita un nuevo correo.
+                </p>
+                <button
+                  onClick={handleResend}
+                  disabled={resendLoading || resendCooldown > 0 || !email}
+                  className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-full border-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ borderColor: '#e91e8c', color: '#e91e8c', background: 'transparent' }}
+                >
+                  {resendLoading ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Enviando...
+                    </>
+                  ) : resendCooldown > 0 ? (
+                    `Reenviar en ${resendCooldown}s`
+                  ) : (
+                    '📧 Reenviar correo de confirmación'
+                  )}
+                </button>
+                {resendMessage && (
+                  <p className="text-xs mt-2 font-medium" style={{ color: resendMessage.startsWith('✅') ? '#16a34a' : '#c0006a' }}>
+                    {resendMessage}
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -122,7 +202,7 @@ function IniciarSesionForm() {
                 autoComplete="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setEmailNotConfirmed(false); setResendMessage(''); }}
                 placeholder="tu@correo.com"
                 className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all duration-150"
                 style={{
