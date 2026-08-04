@@ -14,6 +14,7 @@ interface SpinLead {
   prize: string | null;
   coupon_code: string | null;
   created_at: string;
+  verification_status: string | null;
 }
 
 interface PrizeBreakdown {
@@ -52,7 +53,7 @@ function StatsSection() {
     setLoading(true);
     const { data } = await supabase
       .from('spin_leads')
-      .select('id, email, name, prize, coupon_code, created_at')
+      .select('id, email, name, prize, coupon_code, created_at, verification_status')
       .order('created_at', { ascending: false })
       .limit(200);
     setLeads(data ?? []);
@@ -150,6 +151,7 @@ function StatsSection() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nombre</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Premio</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Cupón</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
                 </tr>
               </thead>
@@ -164,6 +166,15 @@ function StatsSection() {
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-600">{lead.coupon_code ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        lead.verification_status === 'verified'
+                          ? 'bg-green-100 text-green-700'
+                          : lead.verification_status === 'rejected' ?'bg-red-100 text-red-700' :'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {lead.verification_status === 'verified' ? '✓ Verificado' : lead.verification_status === 'rejected' ? '✗ Rechazado' : '⏳ Pendiente'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
                       {new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(lead.created_at))}
                     </td>

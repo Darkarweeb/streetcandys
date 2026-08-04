@@ -37,15 +37,6 @@ function pickWeightedIndex(prizes: SpinPrize[]): number {
   return prizes.length - 1;
 }
 
-function generateCouponCode(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = 'SPIN-';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
-
 // ─── SVG Wheel ────────────────────────────────────────────────────────────────
 function WheelSVG({ rotation, prizes }: { rotation: number; prizes: SpinPrize[] }) {
   const cx = 150;
@@ -120,7 +111,7 @@ export default function SpinToWin() {
 
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
-  const [phase, setPhase] = useState<'form' | 'spinning' | 'result'>('form');
+  const [phase, setPhase] = useState<'form' | 'spinning' | 'result' | 'pending_verification'>('form');
 
   // Form state
   const [email, setEmail] = useState('');
@@ -136,6 +127,13 @@ export default function SpinToWin() {
   const [couponCode, setCouponCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [saveError, setSaveError] = useState('');
+
+  // Verification state
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [pendingPrize, setPendingPrize] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
 
   const spinAnimRef = useRef<number | null>(null);
   const startRotRef = useRef(0);
@@ -183,6 +181,13 @@ export default function SpinToWin() {
     };
   }, [mounted, settingsLoading, settings.enabled, settings.delay_seconds, settings.exit_intent]);
 
+  // ── Resend cooldown timer ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
   // ── Dismiss ─────────────────────────────────────────────────────────────────
   const dismiss = useCallback(() => {
     setVisible(false);
@@ -225,7 +230,7 @@ export default function SpinToWin() {
       spinAnimRef.current = requestAnimationFrame(animateSpin);
     } else {
       setRotation(targetRotRef.current);
-      setPhase('result');
+      // Phase is set after API response is received
     }
   }, []);
 
@@ -253,69 +258,113 @@ export default function SpinToWin() {
 
     setPhase('spinning');
 
-    let code = generateCouponCode();
-    setCouponCode(code);
+    // Start animation immediately
+    spinAnimRef.current = requestAnimationFrame(animateSpin);
 
     const seg = prizes[idx];
     const expirationDays = settings.coupon_expiration_days ?? DEFAULT_SPIN_SETTINGS.coupon_expiration_days;
-    const expiresAt = new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000).toISOString();
     const minPurchase = settings.minimum_purchase ?? DEFAULT_SPIN_SETTINGS.minimum_purchase;
 
-    const supabase = createClient();
+    // ── Call server-side API (handles verification + DB + coupon) ─────────────
+    try {
+      const res = await fetch('/api/spin/girar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          nombre: nombre.trim() || undefined,
+          consent,
+          prizeLabel: seg.label,
+          prizeValue: seg.value,
+          discountType: seg.discountType,
+          couponExpirationDays: expirationDays,
+          minimumPurchase: minPurchase,
+        }),
+      });
 
-    const { error: leadError } = await supabase.from('spin_leads').insert({
-      email: email.trim().toLowerCase(),
-      name: nombre.trim() || null,
-      consent,
-      prize: seg.label,
-      coupon_code: code,
-    });
+      const data = await res.json();
 
-    if (leadError) {
-      console.error('spin_leads insert error:', leadError);
+      // Wait for animation to finish before showing result
+      const waitForAnimation = () =>
+        new Promise<void>((resolve) => {
+          const check = () => {
+            if (!spinAnimRef.current) {
+              resolve();
+            } else {
+              setTimeout(check, 100);
+            }
+          };
+          setTimeout(check, SPIN_DURATION);
+        });
+
+      await waitForAnimation();
+
+      if (!res.ok) {
+        if (data.error === 'already_spun') {
+          // Mark as completed in localStorage so it doesn't show again
+          try {
+            localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true }));
+          } catch {}
+          setSaveError('Este correo ya participó en la ruleta. Solo se permite un giro por correo.');
+          setPhase('result');
+          if (data.existingCoupon) {
+            setCouponCode(data.existingCoupon);
+          }
+        } else {
+          setSaveError(data.error || 'Error al procesar el giro. Intenta de nuevo.');
+          setPhase('result');
+        }
+      } else if (data.status === 'pending_verification') {
+        // Email not confirmed — show verification pending screen
+        setPendingEmail(data.email);
+        setPendingPrize(data.prize);
+        setPhase('pending_verification');
+        try {
+          localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true }));
+        } catch {}
+      } else if (data.status === 'success') {
+        setCouponCode(data.couponCode);
+        setPhase('result');
+        try {
+          localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true }));
+        } catch {}
+      } else {
+        // coupon_error or other partial success
+        setSaveError(data.message || 'Tu premio fue registrado, pero hubo un error al generar el cupón.');
+        setPhase('result');
+        try {
+          localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true }));
+        } catch {}
+      }
+    } catch {
+      setSaveError('Error de conexión. Por favor intenta de nuevo.');
+      setPhase('result');
+    } finally {
+      setSubmitting(false);
     }
-
-    const couponPayload = {
-      code,
-      description: `Ruleta de premios — ${seg.label} — ${email.trim().toLowerCase()}`,
-      discount_type: seg.discountType === 'shipping' ? 'shipping' : 'percentage',
-      discount_value: seg.discountType === 'shipping' ? 0 : (seg.value ?? 5),
-      minimum_order_amount: minPurchase,
-      maximum_discount: null,
-      usage_limit: 1,
-      per_user_limit: 1,
-      country_code: 'CO',
-      is_active: true,
-      starts_at: new Date().toISOString(),
-      expires_at: expiresAt,
-    };
-
-    const { error: couponError } = await supabase.from('coupons').insert(couponPayload);
-    if (couponError) {
-      console.error('coupons insert error:', couponError);
-      setSaveError('Tu premio fue registrado, pero hubo un error al guardar el cupón. Contáctanos.');
-    }
-
-    setSubmitting(false);
-    spinAnimRef.current = requestAnimationFrame(animateSpin);
   };
 
-  // ── Mark completed when result shown ────────────────────────────────────────
-  useEffect(() => {
-    if (phase === 'result') {
-      try {
-        localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true }));
-      } catch {}
-    }
-  }, [phase]);
-
-  // ── Copy coupon ──────────────────────────────────────────────────────────────
-  const handleCopy = () => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(couponCode).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+  // ── Resend confirmation email ────────────────────────────────────────────────
+  const handleResendConfirmation = async () => {
+    if (resendCooldown > 0 || resendLoading) return;
+    setResendLoading(true);
+    setResendMessage('');
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: pendingEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
+      if (error) throw error;
+      setResendMessage('✅ Correo de confirmación reenviado. Revisa tu bandeja de entrada.');
+      setResendCooldown(60);
+    } catch {
+      setResendMessage('No se pudo reenviar el correo. Intenta de nuevo.');
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -373,15 +422,17 @@ export default function SpinToWin() {
           </p>
         </div>
 
-        {/* Wheel */}
-        <div className="flex justify-center items-center py-4 bg-sc-forest relative">
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10" aria-hidden="true">
-            <svg width="24" height="28" viewBox="0 0 24 28" fill="none">
-              <path d="M12 28L0 0h24L12 28z" fill="#EDE8E1" />
-            </svg>
+        {/* Wheel — hidden on pending_verification phase */}
+        {phase !== 'pending_verification' && (
+          <div className="flex justify-center items-center py-4 bg-sc-forest relative">
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10" aria-hidden="true">
+              <svg width="24" height="28" viewBox="0 0 24 28" fill="none">
+                <path d="M12 28L0 0h24L12 28z" fill="#EDE8E1" />
+              </svg>
+            </div>
+            <WheelSVG rotation={rotation} prizes={prizes} />
           </div>
-          <WheelSVG rotation={rotation} prizes={prizes} />
-        </div>
+        )}
 
         <div className="px-6 pb-6">
           {/* ── FORM PHASE ── */}
@@ -470,49 +521,123 @@ export default function SpinToWin() {
             </div>
           )}
 
-          {/* ── RESULT PHASE ── */}
-          {phase === 'result' && winSegment && (
-            <div className="pt-4 text-center space-y-4">
+          {/* ── PENDING VERIFICATION PHASE ── */}
+          {phase === 'pending_verification' && (
+            <div className="pt-6 pb-2 text-center space-y-5">
+              {/* Gift icon */}
+              <div className="flex justify-center">
+                <div className="w-20 h-20 rounded-full bg-sc-forest/10 flex items-center justify-center">
+                  <span className="text-4xl">🎁</span>
+                </div>
+              </div>
+
               <div>
-                <p className="text-sc-muted text-sm">🎉 ¡Felicitaciones! Ganaste</p>
-                <p className="text-sc-forest font-black text-3xl tracking-tightest mt-1">
-                  {winSegment.label === 'Envío Gratis' ? '🚚 Envío Gratis' : `${winSegment.label} de descuento`}
+                <p className="text-sc-forest font-black text-xl leading-tight">
+                  ¡Ganaste {pendingPrize}!
+                </p>
+                <p className="text-sc-forest font-semibold text-base mt-2">
+                  Confirma tu correo del Crew para activar tu descuento 🎁
                 </p>
               </div>
 
-              <div className="bg-sc-beige rounded-card p-4 space-y-2">
-                <p className="text-sc-muted text-xs font-semibold uppercase tracking-widest">Tu código de descuento</p>
-                <p className="font-mono font-black text-sc-forest text-2xl tracking-widest">{couponCode}</p>
-                <button
-                  onClick={handleCopy}
-                  className="w-full bg-sc-forest text-sc-cream font-bold py-2.5 rounded-pill text-sm hover:bg-sc-green transition-colors active:scale-95 flex items-center justify-center gap-2"
-                >
-                  {copied ? (
-                    <>
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                        <path d="M3 8l4 4 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      ¡Copiado!
-                    </>
-                  ) : (
-                    <>
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                        <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-                        <path d="M3 11V3h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      Copiar código
-                    </>
-                  )}
-                </button>
+              <div className="bg-sc-beige rounded-xl p-4 text-left space-y-2">
+                <p className="text-xs text-sc-muted font-semibold uppercase tracking-widest">Tu correo</p>
+                <p className="text-sc-forest font-bold text-sm break-all">{pendingEmail}</p>
+                <p className="text-xs text-sc-muted leading-relaxed">
+                  Enviamos un correo de confirmación a esta dirección. Una vez que confirmes tu cuenta, tu descuento quedará activado automáticamente.
+                </p>
               </div>
 
-              <div className="text-xs text-sc-muted space-y-1">
-                <p>⏰ Válido hasta el <strong className="text-sc-forest">{expiryStr}</strong></p>
-                <p>🛒 Compra mínima: <strong className="text-sc-forest">${minPurchase.toLocaleString('es-CO')} COP</strong></p>
-                {winSegment.discountType === 'shipping' && (
-                  <p className="text-sc-muted">* Envío gratis aplicado como descuento fijo de ${minPurchase.toLocaleString('es-CO')}</p>
+              {resendMessage && (
+                <p className={`text-xs px-3 py-2 rounded-lg ${resendMessage.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                  {resendMessage}
+                </p>
+              )}
+
+              <button
+                onClick={handleResendConfirmation}
+                disabled={resendCooldown > 0 || resendLoading}
+                className="w-full bg-sc-forest text-sc-cream font-bold py-3 rounded-pill text-sm hover:bg-sc-green transition-colors active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {resendLoading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70" />
+                    </svg>
+                    Enviando...
+                  </>
+                ) : resendCooldown > 0 ? (
+                  `Reenviar en ${resendCooldown}s`
+                ) : (
+                  '📧 Reenviar confirmación'
                 )}
-              </div>
+              </button>
+
+              <button
+                onClick={dismiss}
+                className="w-full border border-sc-border text-sc-forest font-semibold py-2.5 rounded-pill text-sm hover:bg-sc-beige transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          )}
+
+          {/* ── RESULT PHASE ── */}
+          {phase === 'result' && winSegment && (
+            <div className="pt-4 text-center space-y-4">
+              {!saveError || couponCode ? (
+                <>
+                  <div>
+                    <p className="text-sc-muted text-sm">🎉 ¡Felicitaciones! Ganaste</p>
+                    <p className="text-sc-forest font-black text-3xl tracking-tightest mt-1">
+                      {winSegment.label === 'Envío Gratis' ? '🚚 Envío Gratis' : `${winSegment.label} de descuento`}
+                    </p>
+                  </div>
+
+                  {couponCode && (
+                    <div className="bg-sc-beige rounded-card p-4 space-y-2">
+                      <p className="text-sc-muted text-xs font-semibold uppercase tracking-widest">Tu código de descuento</p>
+                      <p className="font-mono font-black text-sc-forest text-2xl tracking-widest">{couponCode}</p>
+                      <button
+                        onClick={() => {
+                          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                            navigator.clipboard.writeText(couponCode).then(() => {
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2000);
+                            });
+                          }
+                        }}
+                        className="w-full bg-sc-forest text-sc-cream font-bold py-2.5 rounded-pill text-sm hover:bg-sc-green transition-colors active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        {copied ? (
+                          <>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                              <path d="M3 8l4 4 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            ¡Copiado!
+                          </>
+                        ) : (
+                          <>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                              <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+                              <path d="M3 11V3h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            Copiar código
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="text-xs text-sc-muted space-y-1">
+                    <p>⏰ Válido hasta el <strong className="text-sc-forest">{expiryStr}</strong></p>
+                    <p>🛒 Compra mínima: <strong className="text-sc-forest">${minPurchase.toLocaleString('es-CO')} COP</strong></p>
+                    {winSegment.discountType === 'shipping' && (
+                      <p className="text-sc-muted">* Envío gratis aplicado como descuento fijo de ${minPurchase.toLocaleString('es-CO')}</p>
+                    )}
+                  </div>
+                </>
+              ) : null}
 
               {saveError && (
                 <p className="text-red-500 text-xs bg-red-50 rounded-lg p-2">{saveError}</p>
@@ -522,7 +647,7 @@ export default function SpinToWin() {
                 onClick={dismiss}
                 className="w-full border border-sc-border text-sc-forest font-semibold py-2.5 rounded-pill text-sm hover:bg-sc-beige transition-colors"
               >
-                Ir a comprar →
+                {couponCode ? 'Ir a comprar →' : 'Cerrar'}
               </button>
             </div>
           )}
