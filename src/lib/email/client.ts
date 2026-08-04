@@ -21,5 +21,5 @@ export function getResendClient(): Resend {
 }
 
 // Production sender — requires streetcandys.shop to be a verified domain in Resend
-export const FROM_EMAIL = "Street Candy's <hola@streetcandys.shop>";
-export const REPLY_TO = 'hola@streetcandys.shop';
+export const FROM_EMAIL = "Street Candy's <CREW@streetcandys.shop>";
+export const REPLY_TO = 'CREW@streetcandys.shop';
