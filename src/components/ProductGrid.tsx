@@ -50,7 +50,7 @@ const products: Product[] = [
   intensity: 'high',
   mood: 'Creative',
   badge: 'Top Shelf',
-  image: 'https://images.unsplash.com/photo-1574169208507-84376144848b?w=400&q=80',
+  image: "https://img.rocket.new/generatedImages/rocket_gen_img_118b43080-1785876653204.png",
   alt: 'Premium tropical punch flavored pre-roll joints in a branded tube',
   bgColor: '#E8F5E9'
 },

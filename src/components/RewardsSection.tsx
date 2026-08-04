@@ -8,7 +8,7 @@ export default function RewardsSection() {
         {/* Image */}
         <div className="w-full lg:w-1/2 relative">
           <img
-            src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80"
+            src="https://img.rocket.new/generatedImages/rocket_gen_img_1547a99cd-1785876651777.png"
             alt="Happy customer holding Street Candy's products with a big smile, enjoying rewards program benefits"
             className="w-full h-64 lg:h-[480px] object-cover" />
           
