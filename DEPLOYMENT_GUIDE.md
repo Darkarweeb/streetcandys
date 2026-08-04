@@ -1,9 +1,11 @@
 # STREET CANDYS — Deployment Guide
 
 > **Production domain**: `https://streetcandys.shop`
-> **Framework**: Next.js 15.5.18 (App Router)
+> **Framework**: Next.js 15 (App Router)
 > **Database**: Supabase (hosted)
+> **Email**: Resend (transactional)
 > **Payments**: Stripe
+> **Last updated**: Reflects Resend integration, hardened RLS (migration `20260804200000`), and all codebase changes as of August 2026.
 
 ---
 
@@ -13,10 +15,12 @@ Before deploying to any environment, complete these steps:
 
 - [ ] All environment variables have real values (no placeholders)
 - [ ] `NEXT_PUBLIC_SITE_URL` is set to the production domain (`https://streetcandys.shop`)
+- [ ] `RESEND_API_KEY` is set to a real Resend API key (not `your-resend-api-key-here`)
+- [ ] `FROM_EMAIL` in `src/lib/email/client.ts` uses a verified custom domain address (not `onboarding@resend.dev`)
 - [ ] Supabase Auth redirect URLs include the production domain
+- [ ] All 37 database migrations have been applied to the production Supabase project (through `20260804200000_harden_reward_transactions_rls.sql`)
 - [ ] Stripe webhook endpoint is registered for the production domain
 - [ ] `npm run build` completes without fatal errors locally
-- [ ] All database migrations have been applied to the production Supabase project
 
 ---
 
@@ -43,6 +47,8 @@ with Next.js 15 features including Server Components, Edge Middleware, and Image
    | `SUPABASE_SERVICE_ROLE_KEY` | Production, Preview, Development | Your Supabase service role key |
    | `NEXT_PUBLIC_SITE_URL` | Production | `https://streetcandys.shop` |
    | `NEXT_PUBLIC_SITE_URL` | Preview | Your Vercel preview URL |
+   | `RESEND_API_KEY` | Production | `re_...` (from Resend Dashboard → API Keys) |
+   | `RESEND_API_KEY` | Preview/Development | `re_...` (test key or same key) |
    | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Production | `pk_live_...` |
    | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Preview/Development | `pk_test_...` |
    | `STRIPE_SECRET_KEY` | Production | `sk_live_...` |
@@ -100,7 +106,7 @@ Pull requests get preview deployments at unique URLs.
    ```
 
 5. **Configure environment variables** in Netlify Dashboard → Site → Site configuration → Environment variables:
-   Add all variables listed in the Vercel section above.
+   Add all variables listed in the Vercel section above (including `RESEND_API_KEY`).
 
 ### Domain configuration
 
@@ -157,6 +163,7 @@ cd /var/www/streetcandys
 # 2. Create environment file
 nano .env.local
 # (paste all environment variables — see ENVIRONMENT_SETUP_GUIDE.md)
+# Ensure RESEND_API_KEY has a real value
 
 # 3. Install dependencies
 npm ci
@@ -221,13 +228,47 @@ pm2 restart streetcandys
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://YOUR_REF.supabase.co` | From Supabase Dashboard → Settings → API |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` | From Supabase Dashboard → Settings → API |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | **Secret** — never expose publicly |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | **Secret** — required for rewards writes (hardened RLS) |
 | `NEXT_PUBLIC_SITE_URL` | `https://streetcandys.shop` | Must match Supabase Auth Site URL |
+| `RESEND_API_KEY` | `re_...` | **Required** for all transactional emails — get from [resend.com/api-keys](https://resend.com/api-keys) |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_live_...` | From Stripe Dashboard → Developers → API Keys |
 | `STRIPE_SECRET_KEY` | `sk_live_...` | **Secret** — server-side only |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` | From Stripe Dashboard → Webhooks |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | `G-XXXXXXXXXX` | Optional — Google Analytics |
 | `NEXT_PUBLIC_ADSENSE_ID` | `ca-pub-XXXXXXXXXX` | Optional — Google AdSense |
+
+---
+
+## Resend Email Configuration
+
+The application uses **Resend** for all transactional emails. Three types of emails are sent:
+
+| Email Type | Trigger | Template File |
+|---|---|---|
+| Welcome email | New user registration | `src/lib/email/templates/welcome.ts` |
+| Order confirmation | Order created via checkout | `src/lib/email/templates/order.ts` |
+| Order status updates | Order status changes (processing, shipped, delivered) | `src/lib/email/templates/order.ts` |
+| Rewards notification | Points earned after delivery | `src/lib/email/templates/rewards.ts` |
+
+### Production email setup
+
+1. **Create a Resend account** at [https://resend.com](https://resend.com)
+2. **Verify your domain** (`streetcandys.shop`) in Resend Dashboard → Domains:
+   - Add the DNS TXT and MX records provided by Resend to your domain registrar
+   - Wait for domain verification (usually 5–30 minutes)
+3. **Generate an API key** in Resend Dashboard → API Keys
+4. **Set `RESEND_API_KEY`** in your deployment platform environment variables
+5. **Update `FROM_EMAIL`** in `src/lib/email/client.ts`:
+   ```typescript
+   // Change from:
+   export const FROM_EMAIL = 'Street Candy\'s <onboarding@resend.dev>';
+   // To:
+   export const FROM_EMAIL = 'Street Candy\'s <noreply@streetcandys.shop>';
+   ```
+
+> ⚠️ **Important**: The `onboarding@resend.dev` sender address is a Resend sandbox address.
+> In sandbox mode, emails are only delivered to the Resend account owner's email.
+> All other recipients will not receive emails until a verified custom domain is configured.
 
 ---
 
@@ -267,6 +308,7 @@ After deploying to production, update Supabase to allow redirects from your doma
 
 > ⚠️ If `NEXT_PUBLIC_SITE_URL` is not updated to `https://streetcandys.shop`, all auth
 > email links (verification, password reset) will redirect users to the wrong domain.
+> After email confirmation, users are redirected to `/cuenta` (the account dashboard).
 
 ---
 
@@ -313,9 +355,14 @@ After deploying, verify the following:
 - [ ] SSL certificate is valid (padlock icon in browser)
 - [ ] Products page loads data from Supabase
 - [ ] User registration and email verification work end-to-end
+- [ ] Welcome email is received after registration (confirms Resend is working)
 - [ ] Login and logout work correctly
+- [ ] Email verification link redirects to `https://streetcandys.shop/cuenta`
+- [ ] Coupon application in cart shows correct discount
+- [ ] WhatsApp checkout message includes coupon discount and correct final total
 - [ ] Admin panel accessible at `/admin` with admin credentials
 - [ ] Stripe checkout flow works (use Stripe test card `4242 4242 4242 4242`)
 - [ ] Stripe webhook receives events (check Stripe Dashboard → Webhooks → Recent deliveries)
+- [ ] Rewards points are awarded after an order is marked as delivered
 - [ ] Google Analytics receives pageview events (check GA4 Realtime report)
 - [ ] Images load from Supabase Storage without errors

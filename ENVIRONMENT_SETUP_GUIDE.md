@@ -1,6 +1,7 @@
 # STREET CANDYS — Environment Setup Guide
 
-> **Framework**: Next.js 15.5.18 · **Language**: TypeScript 5 · **Runtime**: Node.js
+> **Framework**: Next.js 15 · **Language**: TypeScript 5 · **Runtime**: Node.js
+> **Last updated**: Reflects Resend email integration, hardened RLS policies (migration `20260804200000`), and all codebase changes as of August 2026.
 
 ---
 
@@ -130,7 +131,8 @@ They are **never** included in the client bundle.
 
 | Variable | Description | Required |
 |---|---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key — bypasses RLS. **Keep secret.** | ✅ Yes |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key — bypasses RLS. **Keep secret.** Used by `createAdminClient()` for rewards writes and admin operations. | ✅ Yes |
+| `RESEND_API_KEY` | Resend API key for transactional email delivery (welcome, order status, rewards). Get from [resend.com/api-keys](https://resend.com/api-keys). | ✅ Yes (email) |
 | `STRIPE_SECRET_KEY` | Stripe secret key for server-side payment operations | ✅ Yes (payments) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret for `/api/pagos/webhook` | ✅ Yes (payments) |
 | `OPENAI_API_KEY` | OpenAI API key | ⚠️ Optional |
@@ -138,7 +140,24 @@ They are **never** included in the client bundle.
 | `ANTHROPIC_API_KEY` | Anthropic Claude API key | ⚠️ Optional |
 | `PERPLEXITY_API_KEY` | Perplexity AI API key | ⚠️ Optional |
 
-### 5.3 Build-time Variables (optional)
+### 5.3 Email Variables — Important Notes
+
+The email system uses **Resend** (`src/lib/email/client.ts`). Two variables control email delivery:
+
+| Item | Current Value | Action Required |
+|---|---|---|
+| `RESEND_API_KEY` | Placeholder in `.env` | **Must be replaced** with a real Resend API key |
+| `FROM_EMAIL` (hardcoded) | `onboarding@resend.dev` | **Must be updated** in `src/lib/email/client.ts` to a verified custom domain address (e.g. `noreply@streetcandys.shop`) before production |
+
+> ⚠️ **Critical**: Until `RESEND_API_KEY` is set to a real value, **no transactional emails
+> will be delivered** — welcome emails, order confirmations, and rewards notifications all
+> fail silently. The application continues to function but customers receive no emails.
+
+> ⚠️ **Sandbox restriction**: The `onboarding@resend.dev` sender address only delivers to
+> the Resend account owner's email in sandbox mode. For production, you must verify a custom
+> domain in the Resend Dashboard and update `FROM_EMAIL` in `src/lib/email/client.ts`.
+
+### 5.4 Build-time Variables (optional)
 
 | Variable | Description | Default |
 |---|---|---|
@@ -170,6 +189,12 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 # Use https://streetcandys.shop for production
 # Use http://localhost:4028 for local development
 NEXT_PUBLIC_SITE_URL=http://localhost:4028
+
+# ─── Resend (Transactional Email) ────────────────────────────────────────────
+# Get your API key from: https://resend.com/api-keys
+# Required for: welcome emails, order status emails, rewards notifications
+# Without this, all emails fail silently — no errors shown to customers
+RESEND_API_KEY=re_...
 
 # ─── Stripe ──────────────────────────────────────────────────────────────────
 # Find these in: Stripe Dashboard → Developers → API Keys
@@ -222,3 +247,17 @@ npm run test
 ```
 
 If the development server starts without errors and the homepage loads, your environment is correctly configured.
+
+---
+
+## 8. Post-Migration Security Notes
+
+Migration `20260804200000_harden_reward_transactions_rls.sql` (applied August 2026) hardened
+the RLS policies on `reward_transactions` and `rewards` tables:
+
+- **Direct browser INSERT/UPDATE on `rewards` and `reward_transactions` is now blocked** for all
+  regular authenticated users.
+- All rewards writes go through `src/lib/rewards/rewards-service.ts` which uses
+  `createAdminClient()` (service role key) server-side.
+- This means `SUPABASE_SERVICE_ROLE_KEY` is **required** for the rewards system to function.
+  If this variable is missing, reward points will not be awarded after order delivery.

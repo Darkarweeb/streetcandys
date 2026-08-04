@@ -2,6 +2,7 @@
 
 > This document covers backup procedures for all critical components of the Street Candys
 > application: source code (GitHub), database (Supabase), storage assets, and configuration.
+> **Last updated**: Reflects all 37 migrations through `20260804200000_harden_reward_transactions_rls.sql` as of August 2026.
 
 ---
 
@@ -64,8 +65,10 @@ git clone --mirror https://github.com/Darkarweeb/streetcandys.git streetcandys-m
 |---|---|---|
 | Environment variables / secrets | `.env.local` (gitignored) | Store in a password manager or secrets vault |
 | Supabase database data | Supabase cloud | See Section 2 |
-| Uploaded product images | Supabase Storage | See Section 3 |
+| Uploaded product images | Supabase Storage | See Section 4 |
 | Stripe configuration | Stripe Dashboard | Screenshot or export webhook settings |
+| Resend API key | Resend Dashboard | Store in password manager |
+| Resend verified domain DNS records | Domain registrar | Document DNS record values |
 
 ---
 
@@ -148,6 +151,57 @@ The project uses sequential SQL migrations in `supabase/migrations/`.
 Each file is prefixed with a timestamp and must be applied in order.
 The current migration state is tracked by Supabase in the `supabase_migrations` schema.
 
+**Current migration count**: 37 files
+**Base migration**: `20260802235150_street_candy_schema.sql`
+**Latest migration**: `20260804200000_harden_reward_transactions_rls.sql`
+
+### Complete migration inventory
+
+```
+supabase/migrations/
+├── 20260802235150_street_candy_schema.sql              ← Base schema
+├── 20260803000000_auth_rls_policies.sql
+├── 20260803001000_cart_rls_policies.sql
+├── 20260803020000_whatsapp_support_setting.sql
+├── 20260803020001_whatsapp_support_full_config.sql
+├── 20260803100000_add_price_crc_to_products.sql
+├── 20260803200000_spin_leads.sql
+├── 20260803300000_spin_to_win_settings.sql
+├── 20260803400000_order_status_tracking.sql
+├── 20260803500000_order_notifications_complete.sql
+├── 20260803600000_addresses_rls_policies.sql
+├── 20260803700000_rewards_program_backend.sql
+├── 20260803800000_wishlist_rls_policies.sql
+├── 20260803900000_blog_scheduled_publishing.sql
+├── 20260803950000_blog_cannabis_articles_batch1.sql
+├── 20260803960000_blog_cannabis_articles_batch2.sql
+├── 20260804000000_blog_translate_to_spanish.sql
+├── 20260804010000_strip_jsonld_from_article_content.sql
+├── 20260804020000_final_blog_content_cleanup.sql
+├── 20260804030000_blog_translate_remaining_articles.sql
+├── 20260804040000_blog_spanish_educational_articles.sql
+├── 20260804050000_admin_setup_system.sql
+├── 20260804060000_admin_product_management.sql
+├── 20260804070000_admin_operations_center.sql
+├── 20260804080000_promotions_system.sql
+├── 20260804090000_reviews_system.sql
+├── 20260804100000_loyalty_dashboard.sql
+├── 20260804110000_notification_center.sql
+├── 20260804120000_confirm_super_admin_email.sql
+├── 20260804130000_confirm_super_admin_backoffice.sql
+├── 20260804140000_fix_super_admin_complete.sql
+├── 20260804150000_fix_admin_rls_and_policies.sql
+├── 20260804160000_fix_blog_cover_images.sql
+├── 20260804170000_blog_unique_cover_images.sql
+├── 20260804180000_email_confirmation_template.sql
+├── 20260804190000_spin_leads_verification.sql
+└── 20260804200000_harden_reward_transactions_rls.sql   ← Latest (security hardening)
+```
+
+> ⚠️ **Critical**: Migration `20260804200000_harden_reward_transactions_rls.sql` must be
+> applied. It restricts direct browser INSERT/UPDATE on `rewards` and `reward_transactions`
+> to service role only. Without it, authenticated users can manipulate their own points balance.
+
 ### Restoring from a SQL dump
 
 If you need to restore the database to a previous state:
@@ -187,14 +241,9 @@ Supabase does not support automatic rollbacks. To undo a migration:
 3. Apply the reverse script via the SQL Editor or `supabase db execute`
 4. Remove or rename the original migration file to prevent it from being re-applied
 
-### Migration file inventory
-
-All 34 migration files are in `supabase/migrations/`. The base schema is:
-```
-20260802235150_street_candy_schema.sql
-```
-All subsequent migrations build on top of this base. If restoring from scratch,
-always start with the base schema migration first.
+> ⚠️ **Special note for `20260804200000_harden_reward_transactions_rls.sql`**: Rolling back
+> this migration removes the security hardening on rewards tables. Only do this if you are
+> replacing it with equivalent protection.
 
 ---
 
@@ -216,10 +265,11 @@ public/
 │       ├── og-image-streetcandys.png
 │       ├── og-image-streetcandys-premium.png
 │       ├── og-image-streetcandys-spanish.png
+│       ├── og-image-streetcandys-new.png
 │       ├── app-icon-streetcandys.png
 │       ├── splash-screen-streetcandys.png
 │       ├── no_image.png
-│       └── blog-*.png  (all blog cover images)
+│       └── blog-*.png  (all blog cover images — 20+ files)
 ```
 
 To restore: `git clone https://github.com/Darkarweeb/streetcandys.git`
@@ -239,7 +289,7 @@ supabase link --project-ref YOUR_PROJECT_REF
 # List all buckets
 supabase storage ls
 
-# Download all files from a bucket
+# Download all files from each bucket
 supabase storage cp --recursive ss://product-images ./backup/product-images/
 supabase storage cp --recursive ss://blog-images ./backup/blog-images/
 supabase storage cp --recursive ss://avatars ./backup/avatars/
@@ -248,9 +298,10 @@ supabase storage cp --recursive ss://avatars ./backup/avatars/
 #### Restoring storage assets to a new project
 
 ```bash
-# Upload files back to a new Supabase project
+# Link to the new project
 supabase link --project-ref YOUR_NEW_PROJECT_REF
 
+# Upload files back
 supabase storage cp --recursive ./backup/product-images/ ss://product-images/
 supabase storage cp --recursive ./backup/blog-images/ ss://blog-images/
 supabase storage cp --recursive ./backup/avatars/ ss://avatars/
@@ -310,9 +361,12 @@ psql "postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgre
   < backup-YYYYMMDD-HHMMSS.sql
 
 # 4. Verify data integrity after restore
-# Check key tables: products, orders, profiles, blog_posts
+# Check key tables: products, orders, profiles, blog_posts, rewards, reward_transactions
 
-# 5. Restart the application
+# 5. Re-apply the hardened RLS migration if it was lost in the restore
+# Apply: supabase/migrations/20260804200000_harden_reward_transactions_rls.sql
+
+# 6. Restart the application
 # VPS: pm2 start streetcandys
 ```
 
@@ -323,7 +377,7 @@ psql "postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgre
 
 # 2. Note the new project reference and credentials
 
-# 3. Apply all migrations to the new project
+# 3. Apply all 37 migrations to the new project
 supabase link --project-ref NEW_PROJECT_REF
 supabase db push
 
@@ -335,6 +389,7 @@ psql "postgresql://postgres:[PASSWORD]@db.[NEW_PROJECT_REF].supabase.co:5432/pos
 supabase link --project-ref NEW_PROJECT_REF
 supabase storage cp --recursive ./backup/product-images/ ss://product-images/
 supabase storage cp --recursive ./backup/blog-images/ ss://blog-images/
+supabase storage cp --recursive ./backup/avatars/ ss://avatars/
 
 # 6. Update environment variables with new Supabase credentials
 # Update NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
@@ -342,7 +397,9 @@ supabase storage cp --recursive ./backup/blog-images/ ss://blog-images/
 
 # 7. Redeploy the application
 
-# 8. Update Supabase Auth URL Configuration with your domain
+# 8. Update Supabase Auth URL Configuration:
+#    Site URL: https://streetcandys.shop
+#    Redirect URLs: https://streetcandys.shop/**, http://localhost:4028/**
 ```
 
 ### Scenario D — GitHub repository deleted or corrupted
@@ -364,11 +421,23 @@ git push --mirror https://github.com/Darkarweeb/streetcandys.git
 1. **Supabase credentials**: Retrieve from Supabase Dashboard → Project Settings → API
 2. **Stripe keys**: Retrieve from Stripe Dashboard → Developers → API Keys
 3. **Stripe webhook secret**: Retrieve from Stripe Dashboard → Developers → Webhooks → your endpoint
-4. **Google Analytics ID**: Retrieve from Google Analytics → Admin → Data Streams
-5. **AI API keys**: Retrieve from the respective provider dashboards (OpenAI, Google AI Studio, Anthropic, Perplexity)
+4. **Resend API key**: Retrieve from Resend Dashboard → API Keys (or generate a new one)
+5. **Google Analytics ID**: Retrieve from Google Analytics → Admin → Data Streams
+6. **AI API keys**: Retrieve from the respective provider dashboards (OpenAI, Google AI Studio, Anthropic, Perplexity)
 
 > **Best practice**: Store all environment variable values in a password manager
 > (1Password, Bitwarden, etc.) as a secure note. Update it whenever keys are rotated.
+
+### Scenario F — Emails stop being delivered
+
+If transactional emails (welcome, order, rewards) stop working:
+
+1. **Check `RESEND_API_KEY`**: Verify it is set to a real value (not `your-resend-api-key-here`)
+2. **Check Resend Dashboard → Logs**: Look for failed delivery attempts and error messages
+3. **Check domain verification**: Resend Dashboard → Domains — confirm `streetcandys.shop` shows "Verified"
+4. **Check `FROM_EMAIL`** in `src/lib/email/client.ts`: Must use a verified domain address, not `onboarding@resend.dev`
+5. **Check API key permissions**: The Resend API key must have "Send emails" permission
+6. **Regenerate API key** if compromised: Resend Dashboard → API Keys → Create new key → Update `RESEND_API_KEY` in deployment platform
 
 ---
 
@@ -377,10 +446,12 @@ git push --mirror https://github.com/Darkarweeb/streetcandys.git
 Run this checklist monthly to confirm your backups are valid:
 
 - [ ] Latest database dump file exists and is less than 7 days old
-- [ ] Database dump can be opened and contains expected table names
+- [ ] Database dump can be opened and contains expected table names (including `rewards`, `reward_transactions`, `spin_leads`)
+- [ ] All 37 migration files are present in `supabase/migrations/` including `20260804200000_harden_reward_transactions_rls.sql`
 - [ ] GitHub repository has been pushed within the last week
 - [ ] At least one tagged release exists in the repository
 - [ ] Supabase automatic backup is enabled and shows recent backup dates
 - [ ] Storage bucket files have been downloaded to a local backup location
-- [ ] Environment variables are documented in a secure password manager
+- [ ] Environment variables are documented in a secure password manager (including `RESEND_API_KEY`)
+- [ ] Resend domain verification status is "Verified" in Resend Dashboard
 - [ ] Recovery steps have been tested in a staging environment (quarterly)

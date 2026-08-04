@@ -2,6 +2,7 @@
 
 > Use this checklist when setting up the project from a fresh clone in a local VS Code environment.
 > Complete each section in order — later sections depend on earlier ones.
+> **Last updated**: Reflects Resend integration, hardened RLS (migration `20260804200000`), and all codebase changes as of August 2026.
 
 ---
 
@@ -53,7 +54,7 @@
 - [ ] Copy the following values into `.env.local`:
   - [ ] `NEXT_PUBLIC_SUPABASE_URL` — Project URL (e.g. `https://xxxx.supabase.co`)
   - [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY` — `anon` / `public` key
-  - [ ] `SUPABASE_SERVICE_ROLE_KEY` — `service_role` key (**keep secret**)
+  - [ ] `SUPABASE_SERVICE_ROLE_KEY` — `service_role` key (**keep secret** — required for rewards writes and admin operations)
 
 ### Configure Auth URL settings
 
@@ -71,6 +72,7 @@
   ```
   > ⚠️ This controls where auth email links (verification, password reset) redirect to.
   > Using the wrong URL here means email links will redirect to the wrong domain.
+  > After email confirmation, users are redirected to `/cuenta` (not `/`).
 
 ### Verify connection
 
@@ -124,7 +126,14 @@ Current migration files (apply in this order):
 20260804150000_fix_admin_rls_and_policies.sql
 20260804160000_fix_blog_cover_images.sql
 20260804170000_blog_unique_cover_images.sql
+20260804180000_email_confirmation_template.sql
+20260804190000_spin_leads_verification.sql
+20260804200000_harden_reward_transactions_rls.sql  ← Security hardening (latest)
 ```
+
+> ⚠️ **Critical**: Migration `20260804200000_harden_reward_transactions_rls.sql` is required.
+> Without it, any authenticated user can directly INSERT/UPDATE their own rewards balance
+> from the browser, bypassing server-side business logic.
 
 ### Option A — Apply via Supabase Dashboard (recommended for first-time setup)
 
@@ -158,8 +167,10 @@ Current migration files (apply in this order):
 - [ ] In Supabase Dashboard → **Table Editor** — confirm these tables exist:
   - `profiles`, `products`, `categories`, `orders`, `order_items`
   - `cart_items`, `addresses`, `reviews`, `blog_posts`, `blog_categories`
-  - `promotions`, `coupons`, `rewards_transactions`, `notifications`
+  - `promotions`, `coupons`, `rewards`, `reward_transactions`, `notifications`
   - `spin_leads`, `spin_to_win_settings`, `whatsapp_settings`
+- [ ] Confirm RLS is **enabled** on `rewards` and `reward_transactions` tables
+- [ ] Confirm INSERT/UPDATE policies on `rewards` and `reward_transactions` are restricted to service role only (from migration `20260804200000`)
 
 ---
 
@@ -210,6 +221,20 @@ Current migration files (apply in this order):
   - **Magic Link** — if magic link login is enabled
 - [ ] Ensure all template links use `{{ .SiteURL }}` (not a hardcoded URL)
 
+### Resend email setup
+
+The application uses **Resend** for all transactional emails (welcome, order status, rewards).
+
+- [ ] Create a Resend account at [https://resend.com](https://resend.com)
+- [ ] Generate an API key in Resend Dashboard → API Keys
+- [ ] Add `RESEND_API_KEY=re_...` to `.env.local`
+- [ ] **For production**: Verify your custom domain (`streetcandys.shop`) in Resend Dashboard → Domains
+- [ ] **For production**: Update `FROM_EMAIL` in `src/lib/email/client.ts` from `onboarding@resend.dev` to `noreply@streetcandys.shop` (or similar verified address)
+
+> ⚠️ Without a real `RESEND_API_KEY`, all emails fail silently. Customers will not receive
+> welcome emails, order confirmations, or rewards notifications. The app continues to work
+> but no emails are sent.
+
 ### Admin user setup
 
 - [ ] Navigate to `http://localhost:4028/admin/setup` in your browser
@@ -221,7 +246,7 @@ Current migration files (apply in this order):
 
 - [ ] Register a new test account at `/registro`
 - [ ] Confirm verification email is received (check spam folder)
-- [ ] Click the verification link — confirm it redirects to `http://localhost:4028`
+- [ ] Click the verification link — confirm it redirects to `http://localhost:4028/cuenta` (not `/`)
 - [ ] Log in at `/iniciar-sesion` — confirm redirect to homepage or `/cuenta`
 - [ ] Log in with admin credentials — confirm redirect to `/admin`
 - [ ] Test password reset flow at `/recuperar-contrasena`
@@ -275,10 +300,16 @@ Current migration files (apply in this order):
 - [ ] Products page (`/productos`) loads and displays products from Supabase
 - [ ] Product detail page (`/productos/[slug]`) loads correctly
 - [ ] Cart drawer opens and items can be added
-- [ ] Checkout page (`/checkout`) loads (Stripe keys required for full flow)
+- [ ] Coupon code can be applied in the cart drawer (discount appears correctly)
+- [ ] WhatsApp checkout button generates correct message with discount applied
+- [ ] Checkout page (`/checkout`) loads and shows correct totals with coupon discount
 - [ ] Blog page (`/blog`) loads and displays articles
+- [ ] Spin-to-win modal works (verified emails receive coupon, unverified get pending state)
 - [ ] Admin dashboard (`/admin`) accessible with admin credentials
 - [ ] Admin products page (`/admin/productos`) loads product list
+- [ ] Customer account (`/cuenta`) accessible after login
+- [ ] Rewards page (`/cuenta/recompensas`) shows correct points balance and tier
+- [ ] Order history (`/cuenta/pedidos`) shows only the logged-in user's orders
 
 ### Build verification
 
@@ -301,8 +332,13 @@ Current migration files (apply in this order):
 |---|---|---|
 | `npm install` fails with registry error | `@dhiwise/component-tagger` unavailable outside Rocket | Remove the package from `package.json` and its loader from `next.config.mjs` |
 | Auth email links redirect to Rocket URL | `NEXT_PUBLIC_SITE_URL` still set to Rocket domain | Update to `http://localhost:4028` in `.env.local` |
+| Email verification redirects to `/` instead of `/cuenta` | Old auth callback code | Confirm `auth/callback/route.ts` defaults `next` to `/cuenta` |
+| No emails delivered (welcome, order, rewards) | `RESEND_API_KEY` is placeholder | Add real Resend API key to `.env.local` |
+| Emails only reach Resend account owner | `FROM_EMAIL` uses `onboarding@resend.dev` sandbox | Verify custom domain in Resend and update `FROM_EMAIL` in `src/lib/email/client.ts` |
 | Images not loading (403 error) | Storage bucket RLS policies not configured | Set bucket to public or add correct RLS policies |
 | `/admin` redirects to homepage | User's `role` in `profiles` table is not `admin` or `staff` | Update role in Supabase Dashboard → Table Editor → `profiles` |
 | Stripe checkout fails | Stripe keys are placeholders | Add real Stripe test keys to `.env.local` |
+| Rewards points not awarded after delivery | `SUPABASE_SERVICE_ROLE_KEY` missing or rewards RLS migration not applied | Verify service role key and apply migration `20260804200000` |
+| Coupon discount shows as 0 in WhatsApp message | Old CartDrawer code | Confirm `CartDrawer.tsx` reads `data.datos?.resumen?.descuento_cupon ?? cupon?.descuento_calculado ?? 0` |
 | `npm run type-check` shows many errors | `ignoreBuildErrors: true` was hiding them | Fix TypeScript errors progressively; they don't block `npm run build` |
 | Dev server crashes on start | `@dhiwise/component-tagger` webpack loader missing | See first row above |
