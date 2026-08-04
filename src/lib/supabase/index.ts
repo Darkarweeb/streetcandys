@@ -10,4 +10,4 @@
  *   Connection check   → import { verifyConnection } from '@/lib/supabase/helpers';
  */
 
-export type { verifyConnection } from './helpers';
+export { verifyConnection } from './helpers';

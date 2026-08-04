@@ -32,7 +32,7 @@ const testimonials = [
 {
   id: 4,
   productName: 'Lemon Haze Flower',
-  productImage: "https://images.unsplash.com/photo-1594663787096-bb4ce20f6a86",
+  productImage: "https://images.unsplash.com/photo-1612369300180-ed761b589b64",
   productAlt: 'Small thumbnail of Lemon Haze Flower product',
   quote: '"The Lemon Haze is exactly what I needed for my creative sessions. Smooth, flavorful, and the effects are consistent every time."',
   reviewer: 'DAVID R.',
