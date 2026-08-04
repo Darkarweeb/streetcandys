@@ -13,8 +13,6 @@ const CartDrawer = dynamic(() => import('@/components/CartDrawer'), {
   ssr: false,
 });
 
-import type { SupabaseClient } from '@supabase/supabase-js';
-
 // ─── Types ───────────────────────────────────────────────────
 interface BlogCategory {
   id: string;
@@ -196,79 +194,57 @@ export default function BlogPage() {
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Supabase client ref — only created client-side
-  const sbRef = useRef<SupabaseClient | null>(null);
+  const categoriesLoadedRef = useRef(false);
 
-  // Initialize supabase client only on client
+  // Fetch categories once on mount via API route
   useEffect(() => {
-    import('@/lib/supabase/client').then(mod => {
-      sbRef.current = mod.createClient();
+    if (categoriesLoadedRef.current) return;
+    categoriesLoadedRef.current = true;
 
-      // Fetch categories
-      sbRef.current
-        .from('blog_categories')
-        .select('id, name, slug, description, is_active')
-        .eq('is_active', true)
-        .order('sort_order')
-        .then(({ data }: { data: BlogCategory[] | null }) => {
-          if (data) setCategories(data);
-        });
+    fetch('/api/blog/categorias')
+      .then(r => r.json())
+      .then(data => {
+        if (data.datos) setCategories(data.datos);
+      })
+      .catch(() => {});
 
-      // Fetch featured
-      sbRef.current
-        .from('blog_posts')
-        .select('*, blog_categories(name, slug), profiles(full_name)')
-        .eq('status', 'published')
-        .eq('is_featured', true)
-        .order('published_at', { ascending: false })
-        .limit(1)
-        .single()
-        .then(({ data }: { data: BlogPost | null }) => {
-          setFeatured(data || null);
-        });
-    });
+    // Fetch featured post via API route
+    fetch('/api/blog?destacado=true')
+      .then(r => r.json())
+      .then(data => {
+        const posts = data.datos;
+        setFeatured(Array.isArray(posts) && posts.length > 0 ? posts[0] : null);
+      })
+      .catch(() => setFeatured(null));
   }, []);
 
   // Fetch posts whenever filters/page change
   const fetchPosts = useCallback(async () => {
-    if (!sbRef.current) return;
     setLoading(true);
     setError(null);
     try {
-      const sb = sbRef.current;
-      let query = sb
-        .from('blog_posts')
-        .select('*, blog_categories(name, slug), profiles(full_name)', { count: 'exact' })
-        .eq('status', 'published')
-        .order('published_at', { ascending: false });
+      const params = new URLSearchParams({
+        pagina: String(page),
+        por_pagina: String(PAGE_SIZE),
+      });
+      if (activeCategory) params.set('categoria', activeCategory);
+      if (search.trim()) params.set('q', search.trim());
 
-      if (activeCategory) {
-        const cat = categories.find((c: BlogCategory) => c.slug === activeCategory);
-        if (cat) query = query.eq('blog_category_id', cat.id);
-      }
-      if (search.trim()) {
-        query = query.or(`title.ilike.%${search}%,excerpt.ilike.%${search}%`);
-      }
-      const from = (page - 1) * PAGE_SIZE;
-      query = query.range(from, from + PAGE_SIZE - 1);
-
-      const { data, count, error: qErr } = await query;
-      if (qErr) throw qErr;
-      setPosts((data as BlogPost[]) || []);
-      setTotal(count || 0);
+      const res = await fetch(`/api/blog?${params.toString()}`);
+      if (!res.ok) throw new Error('Error al obtener artículos');
+      const data = await res.json();
+      setPosts(data.datos || []);
+      setTotal(data.total || 0);
     } catch {
       setError('No se pudieron cargar los artículos. Por favor intenta de nuevo.');
     } finally {
       setLoading(false);
     }
-  }, [page, search, activeCategory, categories]);
+  }, [page, search, activeCategory]);
 
-  // Trigger fetch once supabase is ready and on filter changes
+  // Trigger fetch on filter/page changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (sbRef.current) fetchPosts();
-    }, 50);
-    return () => clearTimeout(timer);
+    fetchPosts();
   }, [fetchPosts]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
