@@ -14,6 +14,12 @@ import {
   STATUS_NOTIFICATION_TITLE,
   STATUS_NOTIFICATION_BODY,
 } from '@/lib/order-status';
+import {
+  sendOrderConfirmationEmail,
+  sendOrderProcessingEmail,
+  sendOrderShippedEmail,
+  sendOrderDeliveredEmail,
+} from '@/lib/email';
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -103,6 +109,49 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           { orden_id: id, numero_orden: orden.order_number, estado },
         );
       }
+    }
+
+    // ── Transactional Email via Resend ────────────────────────────────────────
+    // Fire-and-forget: email failure must never block the status update
+    if (orden.profile_id) {
+      (async () => {
+        try {
+          const { data: customerProfile } = await supabase
+            .from('profiles')
+            .select('email, full_name')
+            .eq('id', orden.profile_id)
+            .single();
+
+          if (!customerProfile?.email) return;
+
+          const emailData = {
+            fullName: customerProfile.full_name || 'Cliente',
+            email: customerProfile.email,
+            orderNumber: orden.order_number,
+            total: String(orden.total),
+            currency: orden.currency_code || 'USD',
+            items: (orden.items || []).map((item) => ({
+              name: item.product_name,
+              quantity: item.quantity,
+              price: String(item.total_price),
+            })),
+            trackingNumber: numero_seguimiento || orden.tracking_number || undefined,
+            estimatedDelivery: estimated_delivery || undefined,
+          };
+
+          if (estado === 'confirmed') {
+            await sendOrderConfirmationEmail(emailData);
+          } else if (estado === 'processing' || estado === 'preparing') {
+            await sendOrderProcessingEmail(emailData);
+          } else if (estado === 'shipped' || estado === 'out_for_delivery') {
+            await sendOrderShippedEmail(emailData);
+          } else if (estado === 'delivered') {
+            await sendOrderDeliveredEmail(emailData);
+          }
+        } catch (emailErr) {
+          console.error('[order-status] Email send failed (non-fatal):', emailErr);
+        }
+      })();
     }
 
     return NextResponse.json({ exito: true, mensaje: `Estado actualizado a: ${estado}` });

@@ -89,6 +89,15 @@ export default function RegistroPage() {
     try {
       await signUp({ email, password, fullName, countryCode });
       setSuccess(true);
+
+      // Fire-and-forget welcome email — registration success is never blocked by this
+      fetch('/api/email/welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, fullName }),
+      }).catch((err) => {
+        console.warn('[registro] Welcome email request failed (non-fatal):', err);
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al crear la cuenta.';
       if (msg.includes('already registered') || msg.includes('already exists')) {
