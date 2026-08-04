@@ -31,6 +31,7 @@ function buildWhatsAppMessage(
   country: Country,
   coupon?: string,
   couponDiscount?: number,
+  orderNumber?: string,
 ): string {
   const countryLabel = country === 'CR' ? '🇨🇷 Costa Rica' : '🇨🇴 Colombia';
   const threshold = FREE_SHIPPING_THRESHOLD[country];
@@ -52,11 +53,13 @@ function buildWhatsAppMessage(
   const couponLine = coupon
     ? `\n🏷️ Cupón: ${coupon}${discount > 0 ? ` (−${formatPriceValue(discount, country)})` : ''}`
     : '';
+  const orderLine = orderNumber ? `\n📋 Pedido: #${orderNumber}` : '';
 
   return (
     `Hola 👋, quiero finalizar mi pedido en Street Candy:\n\n` +
-    `🌍 País: ${countryLabel}\n\n` +
-    `🛒 Productos:\n${lines}` +
+    `🌍 País: ${countryLabel}\n` +
+    orderLine +
+    `\n\n🛒 Productos:\n${lines}` +
     couponLine +
     `\n\n${shippingNote}` +
     `\n💰 Total: ${totalFormatted}` +
@@ -215,13 +218,39 @@ export default function CartDrawer({
     settings.phone.trim() !== '' &&
     availableItems.length > 0;
 
-  const handleWhatsAppCheckout = () => {
+  const handleWhatsAppCheckout = async () => {
+    let orderNumber: string | undefined;
+
+    try {
+      // Attempt to create the order in Supabase before opening WhatsApp
+      const sessionId =
+        typeof window !== 'undefined' ? (localStorage.getItem('sc_session_id') ?? undefined)
+          : undefined;
+
+      const res = await fetch('/api/carrito/whatsapp-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pais: activeCountry,
+          session_id: sessionId,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.exito && data.datos?.numero_orden) {
+        orderNumber = data.datos.numero_orden as string;
+      }
+    } catch {
+      // Non-blocking: if order creation fails, still open WhatsApp
+    }
+
     const message = buildWhatsAppMessage(
       availableItems,
       subtotal,
       activeCountry,
       appliedCoupon?.code ?? coupon,
       couponDiscount,
+      orderNumber,
     );
     const encoded = encodeURIComponent(message);
     window.open(`https://wa.me/${settings.phone}?text=${encoded}`, '_blank', 'noopener,noreferrer');
