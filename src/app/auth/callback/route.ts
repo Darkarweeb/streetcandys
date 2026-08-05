@@ -95,14 +95,49 @@ export async function GET(request: NextRequest) {
   // ── Path C: PKCE code flow (OAuth, magic link) ────────────────────────────
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
+    // ── DEBUG: Path C detailed diagnostics (temporary) ───────────────────
+    const sessionCreated = !!(exchangeData?.session);
+    console.log('[auth/callback] DEBUG Path C: exchangeCodeForSession called');
+    console.log('[auth/callback] DEBUG Path C: session created:', sessionCreated);
+    if (exchangeError) {
+      console.log('[auth/callback] DEBUG Path C: exchangeCodeForSession FAILED');
+      console.log('[auth/callback] DEBUG Path C: error.message:', exchangeError.message);
+      console.log('[auth/callback] DEBUG Path C: error.code:', (exchangeError as any).code ?? 'n/a');
+      console.log('[auth/callback] DEBUG Path C: error.status:', (exchangeError as any).status ?? 'n/a');
+    } else {
+      console.log('[auth/callback] DEBUG Path C: exchangeCodeForSession SUCCESS');
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
+    if (!exchangeError) {
+      // ── Recovery via code flow: redirect to password reset page ─────────
+      // When Supabase sends an authorization code for password recovery,
+      // the session is established here. Redirect to /nueva-contrasena
+      // instead of the generic `next` destination.
+      if (sessionCreated && exchangeData.session?.user) {
+        // Check if this is a recovery session (AMR contains 'otp' or user has no confirmed email yet)
+        // Supabase recovery code flows land here — redirect to password reset
+        const amr = (exchangeData.session as any).amr as Array<{ method: string }> | undefined;
+        const isRecovery = Array.isArray(amr) && amr.some((a) => a.method === 'otp');
+        console.log('[auth/callback] DEBUG Path C: AMR methods:', JSON.stringify(amr ?? []));
+        console.log('[auth/callback] DEBUG Path C: isRecovery (via AMR):', isRecovery);
+        if (isRecovery) {
+          return NextResponse.redirect(`${origin}/nueva-contrasena`);
+        }
+      }
       return NextResponse.redirect(`${origin}${next}`);
     }
 
+    // Surface the exact Supabase error in the redirect URL for browser-visible diagnosis
+    const errMsg = encodeURIComponent(exchangeError.message ?? 'unknown');
+    const errCode = encodeURIComponent(
+      (exchangeError as any).code ?? (exchangeError as any).status ?? 'unknown'
+    );
+    const errSession = sessionCreated ? 'yes' : 'no';
     return NextResponse.redirect(
-      `${origin}/iniciar-sesion?error=enlace-invalido&branch=path-c-code&params=${encodeURIComponent(paramNames.join(','))}`
+      `${origin}/iniciar-sesion?error=enlace-invalido&branch=path-c-code&params=${encodeURIComponent(paramNames.join(','))}&detail=${errMsg}&ecode=${errCode}&session=${errSession}`
     );
   }
 
