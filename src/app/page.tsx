@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import Navigation from '@/components/Navigation';
 import AnnouncementBar from '@/components/AnnouncementBar';
+import StrategicPartnersSection from '@/components/StrategicPartnersSection';
 import type { ProductSummary, CategoryWithChildren } from '@/lib/products/types';
 import { formatPrice, formatPriceValue, isProductAvailableInCountry, type Country } from '@/lib/price';
 import { useCartPersistence } from '@/hooks/useCartPersistence';
@@ -1631,16 +1632,19 @@ export default function HomePage() {
           {/* 9. Blog Preview */}
           <BlogPreview />
 
-          {/* 10. Customer Reviews */}
+          {/* 10. Strategic Partners / Aliados */}
+          <StrategicPartnersSection country={country} />
+
+          {/* 11. Customer Reviews */}
           <CustomerReviews />
 
-          {/* 11. Newsletter */}
+          {/* 12. Newsletter */}
           <NewsletterSection country={country} />
 
-          {/* 12. FAQ */}
+          {/* 13. FAQ */}
           <FAQSection />
 
-          {/* 13. Instagram / Social */}
+          {/* 14. Instagram / Social */}
           <SocialSection />
         </main>
 

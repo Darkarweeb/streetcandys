@@ -166,22 +166,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (error) throw new Error(error.message || 'Error al registrarse. Intenta de nuevo.');
 
     // If profile wasn't auto-created by trigger, create it manually
+    // Wrapped in try-catch: the DB trigger (SECURITY DEFINER) handles this;
+    // the client-side upsert may fail with RLS if the session isn't ready yet — non-fatal.
     if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: data.user.id,
-          email,
-          full_name: fullName,
-          country_code: countryCode,
-          role: 'customer',
-          age_verified: false,
-          is_active: true,
-        }, { onConflict: 'id' });
+      try {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: data.user.id,
+            email,
+            full_name: fullName,
+            country_code: countryCode,
+            role: 'customer',
+            age_verified: false,
+            is_active: true,
+          }, { onConflict: 'id' });
 
-      // Non-fatal: trigger may have already created it
-      if (profileError && profileError.code !== '23505') {
-        console.warn('Perfil no pudo crearse automáticamente:', profileError.message);
+        if (profileError && profileError.code !== '23505') {
+          console.warn('Perfil no pudo crearse automáticamente:', profileError.message);
+        }
+      } catch (profileEx) {
+        // Non-fatal: the DB trigger will have already created the profile
+        console.warn('Profile upsert skipped (trigger handles it):', profileEx);
       }
     }
   };
