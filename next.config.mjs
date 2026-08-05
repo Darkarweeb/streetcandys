@@ -138,15 +138,10 @@ const nextConfig = {
     }
 
     if (dev) {
-      if (!isServer) {
-        config.module.rules.push({
-          test: /\.(jsx|tsx)$/,
-          exclude: [/node_modules/],
-          use: [{
-            loader: '@dhiwise/component-tagger/nextLoader',
-          }],
-        });
-      }
+      // NOTE: @dhiwise/component-tagger is intentionally disabled.
+      // It injects data-component-* attributes during SSR but not during
+      // client hydration, causing React hydration mismatches. The tagger
+      // is a dev convenience tool and its absence does not affect functionality.
       const ignoredPaths = (process.env.WATCH_IGNORED_PATHS || '')
         .split(',')
         .map((p) => p.trim())
@@ -193,6 +188,16 @@ const nextConfig = {
       // Drop capacitor.config from all webpack graphs
       [path.resolve(__dirname, './capacitor.config.ts')]: false,
     };
+
+    if (dev) {
+      config.module.rules.push({
+        test: /\.(jsx|tsx)$/,
+        exclude: [/node_modules/],
+        use: [{
+          loader: '@dhiwise/component-tagger/nextLoader',
+        }],
+      });
+    }
 
     return config;
   },
