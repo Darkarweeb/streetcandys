@@ -1,513 +1,214 @@
 -- =============================================================================
--- SECURITY HARDENING MIGRATION
--- Fixes all 76 Supabase security warnings:
---   1. Function search_path mutable (25 functions)
---   2. Anon/authenticated can execute SECURITY DEFINER functions (23 functions)
+-- SECURITY HARDENING MIGRATION (v2 — ALTER FUNCTION only, zero CREATE OR REPLACE)
+-- Fixes Supabase security warnings:
+--   1. Function search_path mutable (25 functions) — via ALTER FUNCTION SET search_path
+--   2. Anon can execute SECURITY DEFINER functions — via REVOKE EXECUTE
 --   3. RLS policy always true on spin_leads (2 policies)
 --   4. Public bucket allows listing (2 buckets)
 -- =============================================================================
 
 -- =============================================================================
 -- SECTION 1: FIX FUNCTION SEARCH_PATH MUTABLE
--- Add SET search_path = '' to all 25 affected functions so they are immune
--- to search_path hijacking attacks.
+-- Each ALTER FUNCTION is wrapped in a DO block so a mismatched signature
+-- logs a NOTICE instead of aborting the entire migration.
 -- =============================================================================
 
--- 1. admin_exists
-CREATE OR REPLACE FUNCTION public.admin_exists()
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE role IN ('admin', 'super_admin')
-    LIMIT 1
-  );
-$$;
+-- 1. admin_exists()
+DO $$ BEGIN
+  ALTER FUNCTION public.admin_exists() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.admin_exists() not found — skipping search_path fix.';
+END $$;
 
--- 2. assign_order_number (trigger function)
-CREATE OR REPLACE FUNCTION public.assign_order_number()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  IF NEW.order_number IS NULL THEN
-    NEW.order_number := public.generate_order_number();
-  END IF;
-  RETURN NEW;
-END;
-$$;
+-- 2. assign_order_number()
+DO $$ BEGIN
+  ALTER FUNCTION public.assign_order_number() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.assign_order_number() not found — skipping search_path fix.';
+END $$;
 
--- 3. cleanup_spin_otp_codes
-CREATE OR REPLACE FUNCTION public.cleanup_spin_otp_codes()
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  DELETE FROM public.spin_otp_codes
-  WHERE expires_at < NOW() OR used = true;
-END;
-$$;
+-- 3. cleanup_spin_otp_codes()
+DO $$ BEGIN
+  ALTER FUNCTION public.cleanup_spin_otp_codes() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.cleanup_spin_otp_codes() not found — skipping search_path fix.';
+END $$;
 
--- 4. generate_order_number
-CREATE OR REPLACE FUNCTION public.generate_order_number()
-RETURNS text
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_number text;
-  v_exists boolean;
-BEGIN
-  LOOP
-    v_number := 'SC-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || LPAD(FLOOR(RANDOM() * 10000)::text, 4, '0');
-    SELECT EXISTS(SELECT 1 FROM public.orders WHERE order_number = v_number) INTO v_exists;
-    EXIT WHEN NOT v_exists;
-  END LOOP;
-  RETURN v_number;
-END;
-$$;
+-- 4. generate_order_number()
+DO $$ BEGIN
+  ALTER FUNCTION public.generate_order_number() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.generate_order_number() not found — skipping search_path fix.';
+END $$;
 
--- 5. get_admin_product_detail
--- SKIPPED: This function has a return type conflict in the existing DB.
--- To fix it, run manually: DROP FUNCTION public.get_admin_product_detail(text);
--- then re-apply. Excluded here to allow all other fixes to apply safely.
+-- 5. get_admin_product_detail(text)
+DO $$ BEGIN
+  ALTER FUNCTION public.get_admin_product_detail(text) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.get_admin_product_detail(text) not found — skipping search_path fix.';
+END $$;
 
--- 6. get_eligible_promotions
-CREATE OR REPLACE FUNCTION public.get_eligible_promotions(
-  p_user_id uuid DEFAULT NULL,
-  p_subtotal numeric DEFAULT 0,
-  p_product_ids uuid[] DEFAULT ARRAY[]::uuid[],
-  p_category_ids uuid[] DEFAULT ARRAY[]::uuid[]
-)
-RETURNS SETOF public.promotions
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT pr.*
-  FROM public.promotions pr
-  WHERE pr.is_active = true
-    AND (pr.starts_at IS NULL OR pr.starts_at <= NOW())
-    AND (pr.ends_at IS NULL OR pr.ends_at >= NOW())
-    AND (pr.minimum_order_amount IS NULL OR p_subtotal >= pr.minimum_order_amount)
-  ORDER BY pr.discount_value DESC;
-END;
-$$;
+-- 6. get_eligible_promotions(numeric, text, uuid, uuid[], uuid[], text)
+DO $$ BEGIN
+  ALTER FUNCTION public.get_eligible_promotions(numeric, text, uuid, uuid[], uuid[], text) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.get_eligible_promotions(numeric, text, uuid, uuid[], uuid[], text) not found — skipping search_path fix.';
+END $$;
 
--- 7. get_loyalty_summary
-CREATE OR REPLACE FUNCTION public.get_loyalty_summary(p_profile_id uuid)
-RETURNS json
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_result json;
-BEGIN
-  SELECT json_build_object(
-    'points', COALESCE(r.points_balance, 0),
-    'tier', COALESCE(r.tier, 'bronze'),
-    'total_earned', COALESCE(r.total_points_earned, 0)
-  ) INTO v_result
-  FROM public.rewards r
-  WHERE r.profile_id = p_profile_id
-  LIMIT 1;
-  RETURN COALESCE(v_result, json_build_object('points', 0, 'tier', 'bronze', 'total_earned', 0));
-END;
-$$;
+-- 7. get_loyalty_summary(uuid)
+DO $$ BEGIN
+  ALTER FUNCTION public.get_loyalty_summary(uuid) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.get_loyalty_summary(uuid) not found — skipping search_path fix.';
+END $$;
 
--- 8. get_notification_summary
-CREATE OR REPLACE FUNCTION public.get_notification_summary(p_profile_id uuid)
-RETURNS json
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_unread integer;
-BEGIN
-  SELECT COUNT(*) INTO v_unread
-  FROM public.notifications
-  WHERE profile_id = p_profile_id AND read = false;
-  RETURN json_build_object('unread_count', COALESCE(v_unread, 0));
-END;
-$$;
+-- 8. get_notification_summary(uuid)
+DO $$ BEGIN
+  ALTER FUNCTION public.get_notification_summary(uuid) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.get_notification_summary(uuid) not found — skipping search_path fix.';
+END $$;
 
--- 9. get_product_rating_summary
-CREATE OR REPLACE FUNCTION public.get_product_rating_summary(p_product_id uuid)
-RETURNS json
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_result json;
-BEGIN
-  SELECT json_build_object(
-    'average_rating', ROUND(AVG(rating)::numeric, 1),
-    'total_reviews', COUNT(*),
-    'rating_distribution', json_build_object(
-      '5', COUNT(*) FILTER (WHERE rating = 5),
-      '4', COUNT(*) FILTER (WHERE rating = 4),
-      '3', COUNT(*) FILTER (WHERE rating = 3),
-      '2', COUNT(*) FILTER (WHERE rating = 2),
-      '1', COUNT(*) FILTER (WHERE rating = 1)
-    )
-  ) INTO v_result
-  FROM public.reviews
-  WHERE product_id = p_product_id AND status = 'approved';
-  RETURN COALESCE(v_result, json_build_object('average_rating', 0, 'total_reviews', 0));
-END;
-$$;
+-- 9. get_product_rating_summary(uuid)
+DO $$ BEGIN
+  ALTER FUNCTION public.get_product_rating_summary(uuid) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.get_product_rating_summary(uuid) not found — skipping search_path fix.';
+END $$;
 
--- 10. handle_new_user (trigger function)
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, full_name, avatar_url, role)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
-    COALESCE(NEW.raw_user_meta_data->>'avatar_url', ''),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'customer')
-  )
-  ON CONFLICT (id) DO NOTHING;
-  RETURN NEW;
-END;
-$$;
+-- 10. handle_new_user()
+DO $$ BEGIN
+  ALTER FUNCTION public.handle_new_user() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.handle_new_user() not found — skipping search_path fix.';
+END $$;
 
--- 11. has_purchased_product
-CREATE OR REPLACE FUNCTION public.has_purchased_product(p_profile_id uuid, p_product_id uuid)
-RETURNS boolean
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1
-    FROM public.orders o
-    JOIN public.order_items oi ON oi.order_id = o.id
-    WHERE o.profile_id = p_profile_id
-      AND oi.product_id = p_product_id
-      AND o.status IN ('delivered', 'completed')
-  );
-END;
-$$;
+-- 11. has_purchased_product(uuid, uuid)
+DO $$ BEGIN
+  ALTER FUNCTION public.has_purchased_product(uuid, uuid) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.has_purchased_product(uuid, uuid) not found — skipping search_path fix.';
+END $$;
 
--- 12. is_admin_or_staff
-CREATE OR REPLACE FUNCTION public.is_admin_or_staff()
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE id = auth.uid()
-      AND role IN ('admin', 'super_admin', 'staff')
-  );
-$$;
+-- 12. is_admin_or_staff()
+DO $$ BEGIN
+  ALTER FUNCTION public.is_admin_or_staff() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.is_admin_or_staff() not found — skipping search_path fix.';
+END $$;
 
--- 13. is_admin_user
-CREATE OR REPLACE FUNCTION public.is_admin_user()
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE id = auth.uid()
-      AND role IN ('admin', 'super_admin')
-  );
-$$;
+-- 13. is_admin_user()
+DO $$ BEGIN
+  ALTER FUNCTION public.is_admin_user() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.is_admin_user() not found — skipping search_path fix.';
+END $$;
 
--- 14. is_allowed_country
-CREATE OR REPLACE FUNCTION public.is_allowed_country(p_country_code character)
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.countries
-    WHERE code = p_country_code AND is_active = true
-  );
-$$;
+-- 14. is_allowed_country(character)
+DO $$ BEGIN
+  ALTER FUNCTION public.is_allowed_country(character) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.is_allowed_country(character) not found — skipping search_path fix.';
+END $$;
 
--- 15. notify_review_status_change (trigger function)
-CREATE OR REPLACE FUNCTION public.notify_review_status_change()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  IF OLD.status IS DISTINCT FROM NEW.status THEN
-    INSERT INTO public.notifications (profile_id, type, title, message, data)
-    VALUES (
-      NEW.profile_id,
-      'review_status',
-      CASE NEW.status
-        WHEN 'approved' THEN 'Reseña aprobada'
-        WHEN 'rejected' THEN 'Reseña rechazada'
-        ELSE 'Estado de reseña actualizado'
-      END,
-      'El estado de tu reseña ha sido actualizado.',
-      json_build_object('review_id', NEW.id, 'status', NEW.status)
-    );
-  END IF;
-  RETURN NEW;
-END;
-$$;
+-- 15. notify_review_status_change()
+DO $$ BEGIN
+  ALTER FUNCTION public.notify_review_status_change() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.notify_review_status_change() not found — skipping search_path fix.';
+END $$;
 
--- 16. notify_tier_upgrade (trigger function)
-CREATE OR REPLACE FUNCTION public.notify_tier_upgrade()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  IF OLD.tier IS DISTINCT FROM NEW.tier THEN
-    INSERT INTO public.notifications (profile_id, type, title, message, data)
-    VALUES (
-      NEW.profile_id,
-      'tier_upgrade',
-      '¡Subiste de nivel!',
-      'Has alcanzado el nivel ' || NEW.tier || ' en el programa de recompensas.',
-      json_build_object('old_tier', OLD.tier, 'new_tier', NEW.tier)
-    );
-  END IF;
-  RETURN NEW;
-END;
-$$;
+-- 16. notify_tier_upgrade()
+DO $$ BEGIN
+  ALTER FUNCTION public.notify_tier_upgrade() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.notify_tier_upgrade() not found — skipping search_path fix.';
+END $$;
 
--- 17. publish_scheduled_posts
-CREATE OR REPLACE FUNCTION public.publish_scheduled_posts()
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  UPDATE public.blog_posts
-  SET status = 'published', published_at = NOW()
-  WHERE status = 'scheduled'
-    AND scheduled_at <= NOW();
-END;
-$$;
+-- 17. publish_scheduled_posts()
+DO $$ BEGIN
+  ALTER FUNCTION public.publish_scheduled_posts() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.publish_scheduled_posts() not found — skipping search_path fix.';
+END $$;
 
--- 18. record_promotion_redemption
-CREATE OR REPLACE FUNCTION public.record_promotion_redemption(
-  p_promotion_id uuid,
-  p_profile_id uuid,
-  p_order_id uuid,
-  p_discount_amount numeric
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  INSERT INTO public.promotion_redemptions (promotion_id, profile_id, order_id, discount_amount)
-  VALUES (p_promotion_id, p_profile_id, p_order_id, p_discount_amount);
+-- 18. record_promotion_redemption(uuid, uuid, uuid, numeric, numeric, text)
+--     Signature from 20260804080000_promotions_system.sql:
+--     (p_promotion_id UUID, p_profile_id UUID, p_order_id UUID,
+--      p_discount_amount NUMERIC, p_cart_total NUMERIC, p_country_code TEXT)
+DO $$ BEGIN
+  ALTER FUNCTION public.record_promotion_redemption(uuid, uuid, uuid, numeric, numeric, text) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.record_promotion_redemption(uuid, uuid, uuid, numeric, numeric, text) not found — skipping search_path fix.';
+END $$;
 
-  UPDATE public.promotions
-  SET usage_count = COALESCE(usage_count, 0) + 1
-  WHERE id = p_promotion_id;
-END;
-$$;
+-- 19. redeem_loyalty_reward(uuid, uuid)
+DO $$ BEGIN
+  ALTER FUNCTION public.redeem_loyalty_reward(uuid, uuid) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.redeem_loyalty_reward(uuid, uuid) not found — skipping search_path fix.';
+END $$;
 
--- 19. redeem_loyalty_reward
-CREATE OR REPLACE FUNCTION public.redeem_loyalty_reward(p_profile_id uuid, p_reward_id uuid)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_reward public.loyalty_rewards%ROWTYPE;
-  v_points integer;
-BEGIN
-  SELECT * INTO v_reward FROM public.loyalty_rewards WHERE id = p_reward_id AND is_active = true;
-  IF NOT FOUND THEN
-    RETURN json_build_object('success', false, 'error', 'Reward not found');
-  END IF;
+-- 20. send_admin_announcement(text, text, text, text, jsonb)
+--     Signature from 20260804110000_notification_center.sql:
+--     (p_title TEXT, p_body TEXT, p_action_url TEXT, p_target TEXT, p_data JSONB)
+DO $$ BEGIN
+  ALTER FUNCTION public.send_admin_announcement(text, text, text, text, jsonb) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.send_admin_announcement(text, text, text, text, jsonb) not found — skipping search_path fix.';
+END $$;
 
-  SELECT points_balance INTO v_points FROM public.rewards WHERE profile_id = p_profile_id;
-  IF COALESCE(v_points, 0) < v_reward.points_required THEN
-    RETURN json_build_object('success', false, 'error', 'Insufficient points');
-  END IF;
+-- 21. set_updated_at()
+DO $$ BEGIN
+  ALTER FUNCTION public.set_updated_at() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.set_updated_at() not found — skipping search_path fix.';
+END $$;
 
-  INSERT INTO public.loyalty_reward_redemptions (profile_id, reward_id, points_used)
-  VALUES (p_profile_id, p_reward_id, v_reward.points_required);
+-- 22. setup_first_admin(uuid)
+DO $$ BEGIN
+  ALTER FUNCTION public.setup_first_admin(uuid) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.setup_first_admin(uuid) not found — skipping search_path fix.';
+END $$;
 
-  UPDATE public.rewards
-  SET points_balance = points_balance - v_reward.points_required
-  WHERE profile_id = p_profile_id;
+-- 23. update_promotions_updated_at()
+DO $$ BEGIN
+  ALTER FUNCTION public.update_promotions_updated_at() SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.update_promotions_updated_at() not found — skipping search_path fix.';
+END $$;
 
-  RETURN json_build_object('success', true);
-END;
-$$;
+-- 24. upsert_product_inventory(uuid, integer, integer, boolean, uuid)
+--     Signature from 20260804060000_admin_product_management.sql:
+--     (p_product_id UUID, p_quantity INTEGER, p_low_stock_threshold INTEGER DEFAULT 5,
+--      p_allow_backorder BOOLEAN DEFAULT false, p_variant_id UUID DEFAULT NULL)
+DO $$ BEGIN
+  ALTER FUNCTION public.upsert_product_inventory(uuid, integer, integer, boolean, uuid) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.upsert_product_inventory(uuid, integer, integer, boolean, uuid) not found — skipping search_path fix.';
+END $$;
 
--- 20. send_admin_announcement
-CREATE OR REPLACE FUNCTION public.send_admin_announcement(
-  p_title text,
-  p_message text,
-  p_type text DEFAULT 'info'
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  INSERT INTO public.notifications (profile_id, type, title, message)
-  SELECT id, p_type, p_title, p_message
-  FROM public.profiles
-  WHERE role NOT IN ('admin', 'super_admin');
-END;
-$$;
-
--- 21. set_updated_at (trigger function)
-CREATE OR REPLACE FUNCTION public.set_updated_at()
-RETURNS trigger
-LANGUAGE plpgsql
-SET search_path = ''
-AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$;
-
--- 22. setup_first_admin
-CREATE OR REPLACE FUNCTION public.setup_first_admin(user_id uuid)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  UPDATE public.profiles
-  SET role = 'super_admin'
-  WHERE id = user_id;
-END;
-$$;
-
--- 23. update_promotions_updated_at (trigger function)
-CREATE OR REPLACE FUNCTION public.update_promotions_updated_at()
-RETURNS trigger
-LANGUAGE plpgsql
-SET search_path = ''
-AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$;
-
--- 24. upsert_product_inventory
-CREATE OR REPLACE FUNCTION public.upsert_product_inventory(
-  p_product_id uuid,
-  p_variant_id uuid,
-  p_quantity integer,
-  p_low_stock_threshold integer DEFAULT 5
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  INSERT INTO public.inventory (product_id, variant_id, quantity, low_stock_threshold)
-  VALUES (p_product_id, p_variant_id, p_quantity, p_low_stock_threshold)
-  ON CONFLICT (product_id, variant_id) DO UPDATE
-    SET quantity = EXCLUDED.quantity,
-        low_stock_threshold = EXCLUDED.low_stock_threshold,
-        updated_at = NOW();
-END;
-$$;
-
--- 25. validate_promotion_coupon
-CREATE OR REPLACE FUNCTION public.validate_promotion_coupon(
-  p_code text,
-  p_profile_id uuid DEFAULT NULL,
-  p_subtotal numeric DEFAULT 0
-)
-RETURNS json
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_coupon public.coupons%ROWTYPE;
-BEGIN
-  SELECT * INTO v_coupon
-  FROM public.coupons
-  WHERE code = UPPER(p_code) AND is_active = true
-  LIMIT 1;
-
-  IF NOT FOUND THEN
-    RETURN json_build_object('valid', false, 'error', 'Cupón no encontrado');
-  END IF;
-
-  IF v_coupon.expires_at IS NOT NULL AND v_coupon.expires_at < NOW() THEN
-    RETURN json_build_object('valid', false, 'error', 'Cupón expirado');
-  END IF;
-
-  IF v_coupon.minimum_order_amount IS NOT NULL AND p_subtotal < v_coupon.minimum_order_amount THEN
-    RETURN json_build_object('valid', false, 'error', 'Monto mínimo no alcanzado');
-  END IF;
-
-  RETURN json_build_object(
-    'valid', true,
-    'coupon_id', v_coupon.id,
-    'discount_type', v_coupon.discount_type,
-    'discount_value', v_coupon.discount_value
-  );
-END;
-$$;
+-- 25. validate_promotion_coupon(text, numeric, text, uuid)
+--     Signature from 20260804080000_promotions_system.sql:
+--     (p_code TEXT, p_subtotal NUMERIC, p_country_code TEXT, p_profile_id UUID DEFAULT NULL)
+DO $$ BEGIN
+  ALTER FUNCTION public.validate_promotion_coupon(text, numeric, text, uuid) SET search_path = '';
+EXCEPTION WHEN undefined_function THEN
+  RAISE NOTICE 'Function public.validate_promotion_coupon(text, numeric, text, uuid) not found — skipping search_path fix.';
+END $$;
 
 -- =============================================================================
 -- SECTION 2: REVOKE ANON EXECUTE ON SENSITIVE SECURITY DEFINER FUNCTIONS
--- Functions that should NOT be callable by unauthenticated users.
--- We keep anon access only on truly public functions (admin_exists,
--- get_product_rating_summary, validate_promotion_coupon, get_eligible_promotions,
--- is_allowed_country) since the app uses them without auth.
+-- Revokes are always safe — they never touch return types or function bodies.
+-- Public-facing functions (admin_exists, get_product_rating_summary,
+-- validate_promotion_coupon, get_eligible_promotions, is_allowed_country)
+-- retain anon access since the storefront needs them without auth.
+-- No revokes from authenticated role.
 -- =============================================================================
 
--- Revoke anon execute from internal/admin-only functions
 REVOKE EXECUTE ON FUNCTION public.cleanup_spin_otp_codes() FROM anon;
--- get_admin_product_detail REVOKE skipped (return type conflict — see note above)
+REVOKE EXECUTE ON FUNCTION public.get_admin_product_detail(text) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.get_loyalty_summary(uuid) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.get_notification_summary(uuid) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon;
@@ -517,15 +218,18 @@ REVOKE EXECUTE ON FUNCTION public.is_admin_user() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.notify_review_status_change() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.notify_tier_upgrade() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.publish_scheduled_posts() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.record_promotion_redemption(uuid, uuid, uuid, numeric) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.record_promotion_redemption(uuid, uuid, uuid, numeric, numeric, text) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.redeem_loyalty_reward(uuid, uuid) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.send_admin_announcement(text, text, text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.send_admin_announcement(text, text, text, text, jsonb) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.set_updated_at() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.setup_first_admin(uuid) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.update_promotions_updated_at() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.upsert_product_inventory(uuid, uuid, integer, integer) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.upsert_product_inventory(uuid, integer, integer, boolean, uuid) FROM anon;
 
--- Revoke anon execute from rls_auto_enable if it exists
+-- is_admin() — used in RLS policies but not needed by anon callers directly
+REVOKE EXECUTE ON FUNCTION public.is_admin() FROM anon;
+
+-- rls_auto_enable — conditional: only revoke if the function exists
 DO $$
 BEGIN
   IF EXISTS (
@@ -534,24 +238,20 @@ BEGIN
     WHERE n.nspname = 'public' AND p.proname = 'rls_auto_enable'
   ) THEN
     EXECUTE 'REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM anon';
-    EXECUTE 'REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM authenticated';
   END IF;
 END $$;
 
 -- =============================================================================
 -- SECTION 3: FIX RLS POLICY ALWAYS TRUE ON spin_leads
--- Replace WITH CHECK (true) INSERT policies with proper validation.
--- spin_leads captures spin wheel entries — anon users should be able to insert
--- their own lead (by email), but we tighten the check so it's not a blank pass.
+-- Replace WITH CHECK (true) INSERT policies with proper email validation.
+-- Anon users can still insert their spin wheel lead, but empty/garbage
+-- email addresses are rejected.
 -- =============================================================================
 
--- Drop the overly permissive INSERT policies
 DROP POLICY IF EXISTS "spin_leads_insert" ON public.spin_leads;
 DROP POLICY IF EXISTS "spin_leads_insert_any" ON public.spin_leads;
-
--- Recreate with a meaningful check: email must be non-empty
--- This prevents trivially empty inserts while still allowing the spin wheel to work
 DROP POLICY IF EXISTS "spin_leads_insert_validated" ON public.spin_leads;
+
 CREATE POLICY "spin_leads_insert_validated"
 ON public.spin_leads
 FOR INSERT
@@ -564,12 +264,10 @@ WITH CHECK (
 
 -- =============================================================================
 -- SECTION 4: FIX PUBLIC BUCKET LISTING
--- Replace broad SELECT policies that allow listing all files with
--- policies that only allow reading specific objects (by path prefix or
--- requiring an authenticated user for listing).
+-- product-images: allow public read of individual objects but NOT directory listing.
+-- review-photos: restrict to authenticated users only.
 -- =============================================================================
 
--- product-images bucket: allow public READ of individual objects but NOT listing
 DROP POLICY IF EXISTS "product_images_public_read" ON storage.objects;
 CREATE POLICY "product_images_public_read"
 ON storage.objects
@@ -580,7 +278,6 @@ USING (
   AND name IS NOT NULL
 );
 
--- review-photos bucket: only authenticated users can list/read
 DROP POLICY IF EXISTS "review_photos_public_read" ON storage.objects;
 CREATE POLICY "review_photos_public_read"
 ON storage.objects
@@ -592,7 +289,7 @@ USING (
 
 -- =============================================================================
 -- NOTE: Leaked Password Protection (auth_leaked_password_protection)
--- This must be enabled via the Supabase Dashboard:
+-- Must be enabled via the Supabase Dashboard:
 -- Authentication → Sign In / Up → Password Strength → Enable "Leaked password protection"
--- It cannot be configured via SQL migration.
+-- Cannot be configured via SQL migration.
 -- =============================================================================

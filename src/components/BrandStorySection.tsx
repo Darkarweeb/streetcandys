@@ -8,7 +8,7 @@ export default function BrandStorySection() {
         {/* Image */}
         <div className="w-full lg:w-1/2 relative min-h-[320px] lg:min-h-[480px]">
           <img
-            src="https://images.unsplash.com/photo-1674671261877-66b79ea534c8"
+            src="https://images.unsplash.com/photo-1586195831465-e769c717f1e1"
             alt="Street Candy's founder and family in the kitchen crafting cannabis-infused edibles and candy recipes"
             className="w-full h-full object-cover absolute inset-0" />
           
