@@ -49,6 +49,33 @@ export async function POST(req: NextRequest) {
 
     const adminClient = createAdminClient();
 
+    // ── GATE: Require a verified OTP for this email ───────────────────────────
+    // The frontend calls /api/spin/send-otp then /api/spin/verify-otp first.
+    // This endpoint checks that a verified, non-expired OTP exists before
+    // creating any coupon. This guarantees the inbox is real.
+    const { data: verifiedOTP, error: otpCheckError } = await adminClient
+      .from('spin_otp_codes')
+      .select('id, expires_at')
+      .eq('email', normalizedEmail)
+      .eq('verified', true)
+      .gte('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (otpCheckError) {
+      console.error('spin_otp_codes gate check error:', otpCheckError);
+      return NextResponse.json({ error: 'Error al verificar el código' }, { status: 500 });
+    }
+
+    if (!verifiedOTP) {
+      // No valid verified OTP found — reject the spin attempt
+      return NextResponse.json(
+        { error: 'otp_required', message: 'Debes verificar tu correo antes de girar.' },
+        { status: 403 }
+      );
+    }
+
     // ── Check if email already spun ───────────────────────────────────────────
     const { data: existingLead, error: checkError } = await adminClient
       .from('spin_leads')
@@ -74,70 +101,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Verify email confirmation via Supabase Auth ───────────────────────────
-    // Uses the service-role admin API to look up the user by email and check
-    // email_confirmed_at. This is the authoritative source — NOT the profiles table.
-    const { data: usersPage, error: authLookupError } = await adminClient.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
-
-    if (authLookupError) {
-      console.error('auth.admin.listUsers error:', authLookupError);
-      return NextResponse.json({ error: 'Error al verificar la cuenta' }, { status: 500 });
-    }
-
-    const authUser = usersPage?.users?.find(
-      (u) => u.email?.toLowerCase() === normalizedEmail
-    ) ?? null;
-
-    // email_confirmed_at must be a non-null, non-empty string for the email to be verified
-    const isEmailConfirmed = !!(authUser && authUser.email_confirmed_at);
-
-    if (!isEmailConfirmed) {
-      // ── Save pending lead (no coupon) ─────────────────────────────────────
-      const prizeType = discountType === 'shipping' ? 'free_shipping' : 'percentage';
-      const safeValue = prizeValue ?? 0;
-
-      const { error: pendingLeadError } = await adminClient.from('spin_leads').insert({
-        email: normalizedEmail,
-        first_name: nombre?.trim() || null,
-        marketing_consent: consent,
-        prize_label: prizeLabel,
-        prize_type: prizeType,
-        prize_value: safeValue,
-        coupon_id: null,
-        coupon_code: null,
-        ip_address: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? null,
-        user_agent: req.headers.get('user-agent') ?? null,
-        user_id: authUser?.id ?? null,
-        verification_status: 'pending',
-        verified_at: null,
-      });
-
-      if (pendingLeadError) {
-        // Unique constraint — race condition, treat as already_spun
-        if (pendingLeadError.code === '23505') {
-          return NextResponse.json(
-            { error: 'already_spun', message: 'Este correo ya participó en la ruleta.' },
-            { status: 409 }
-          );
-        }
-        console.error('spin_leads pending insert error:', pendingLeadError);
-        // Still return pending_verification even if DB insert fails
-      }
-
-      return NextResponse.json({
-        status: 'pending_verification',
-        email: normalizedEmail,
-        prize: prizeLabel,
-        message: authUser
-          ? 'Tu correo aún no ha sido confirmado. Revisa tu bandeja de entrada y confirma tu cuenta para recibir tu cupón.'
-          : 'No encontramos una cuenta con este correo. Regístrate y confirma tu correo para recibir tu cupón.',
-      });
-    }
-
-    // ── Email is confirmed — proceed to create coupon ─────────────────────────
+    // ── Email is OTP-verified — proceed to create coupon ─────────────────────
     const prizeType = discountType === 'shipping' ? 'free_shipping' : 'percentage';
     const safeValue = prizeValue ?? 0;
 
@@ -145,8 +109,6 @@ export async function POST(req: NextRequest) {
     const expiryDays = couponExpirationDays > 0 ? couponExpirationDays : 7;
     const expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000).toISOString();
 
-    // coupons.discount_type CHECK: 'percentage' | 'fixed'
-    // coupons.discount_value CHECK: > 0
     const couponDiscountType = discountType === 'shipping' ? 'fixed' : 'percentage';
     const couponDiscountValue = discountType === 'shipping' ? 1 : Math.max(safeValue, 1);
 
@@ -186,13 +148,12 @@ export async function POST(req: NextRequest) {
       coupon_code: couponCode,
       ip_address: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? null,
       user_agent: req.headers.get('user-agent') ?? null,
-      user_id: authUser.id,
+      user_id: null,
       verification_status: 'verified',
       verified_at: new Date().toISOString(),
     });
 
     if (leadError) {
-      // Unique constraint violation — race condition
       if (leadError.code === '23505') {
         return NextResponse.json(
           { error: 'already_spun', message: 'Este correo ya participó en la ruleta.' },
@@ -200,21 +161,17 @@ export async function POST(req: NextRequest) {
         );
       }
       console.error('spin_leads insert error:', leadError);
-      // Coupon was created but lead failed — still return success with coupon
-      return NextResponse.json({
-        status: 'success',
-        prize: prizeLabel,
-        couponCode,
-        expiresAt,
-      });
+      // Coupon was created but lead failed — still return success
+      return NextResponse.json({ status: 'success', prize: prizeLabel, couponCode, expiresAt });
     }
 
-    return NextResponse.json({
-      status: 'success',
-      prize: prizeLabel,
-      couponCode,
-      expiresAt,
-    });
+    // ── Consume the OTP so it cannot be reused ────────────────────────────────
+    await adminClient
+      .from('spin_otp_codes')
+      .delete()
+      .eq('id', verifiedOTP.id);
+
+    return NextResponse.json({ status: 'success', prize: prizeLabel, couponCode, expiresAt });
   } catch (err) {
     console.error('spin API unexpected error:', err);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
