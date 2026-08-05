@@ -23,7 +23,7 @@ SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE role IN ('admin', 'super_admin')
+    WHERE role = 'admin'::public.user_role
     LIMIT 1
   );
 $$;
@@ -241,7 +241,7 @@ AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid()
-      AND role IN ('admin', 'super_admin', 'staff')
+      AND role IN ('admin', 'staff')
   );
 $$;
 
@@ -256,7 +256,7 @@ AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid()
-      AND role IN ('admin', 'super_admin')
+      AND role = 'admin'::public.user_role
   );
 $$;
 
@@ -406,7 +406,7 @@ BEGIN
   INSERT INTO public.notifications (profile_id, type, title, message)
   SELECT id, p_type, p_title, p_message
   FROM public.profiles
-  WHERE role NOT IN ('admin', 'super_admin');
+  WHERE role NOT IN ('admin', 'staff');
 END;
 $$;
 
@@ -431,7 +431,7 @@ SET search_path = ''
 AS $$
 BEGIN
   UPDATE public.profiles
-  SET role = 'super_admin'
+  SET role = 'admin'::public.user_role
   WHERE id = user_id;
 END;
 $$;
