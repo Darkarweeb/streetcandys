@@ -175,10 +175,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error('[signUp] ERROR DETAILS:');
       console.error('  error.message :', error.message);
       console.error('  error.code    :', (error as any).code);
+      console.error('  error.details :', (error as any).details);
+      console.error('  error.hint    :', (error as any).hint);
       console.error('  error.status  :', (error as any).status);
       console.error('  error.name    :', error.name);
-      console.error('  full error obj:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      throw error;
+      console.error('  full error obj:', error);
+      throw new Error(error.message || 'Error al crear la cuenta.');
     }
 
     // Profile is created automatically by the handle_new_user() SECURITY DEFINER trigger
