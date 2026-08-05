@@ -14,7 +14,7 @@ const testimonials = [
 {
   id: 2,
   productName: 'Midnight Blueberry Drops',
-  productImage: "https://images.unsplash.com/photo-1633122264453-4f894bb97dfc",
+  productImage: "https://img.rocket.new/generatedImages/rocket_gen_img_1336e2ebc-1772460531497.png",
   productAlt: 'Small thumbnail of Midnight Blueberry Drops sleep gummies',
   quote: '"I finally sleep through the night! Street Candy\'s has completely changed my routine. The quality is unmatched and shipping was super fast."',
   reviewer: 'MARCUS T.',
@@ -23,7 +23,7 @@ const testimonials = [
 {
   id: 3,
   productName: 'Tropical Punch Pre-Rolls',
-  productImage: "https://img.rocket.new/generatedImages/rocket_gen_img_118b43080-1785876653204.png",
+  productImage: "https://img.rocket.new/generatedImages/rocket_gen_img_123a4b574-1785340304634.png",
   productAlt: 'Small thumbnail of Tropical Punch Pre-Rolls product',
   quote: '"Top shelf quality every single time. I\'ve tried many brands but Street Candy\'s is on another level. The pre-rolls are perfectly crafted."',
   reviewer: 'SARAH K.',
