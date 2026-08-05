@@ -15,10 +15,15 @@ import { useEffect } from 'react';
  * Fix: Intercept the error, clear ALL caches (Cache API + localStorage/sessionStorage
  * Next.js entries), and force a hard reload so the browser fetches the latest chunks.
  * A reload guard prevents infinite reload loops.
+ *
+ * Counter reset: delayed 5 s after mount so the guard isn't cleared before
+ * the error fires during hydration.
  */
 
 const RELOAD_COUNT_KEY = '__sc_chunk_reload_count__';
 const MAX_RELOADS = 2;
+// How long (ms) the app must stay alive before we consider it "stable"
+const STABLE_DELAY_MS = 5000;
 
 function getReloadCount(): number {
   try {
@@ -114,12 +119,16 @@ function handleChunkError() {
 
 export default function ChunkErrorHandler() {
   useEffect(() => {
-    // Reset reload counter on successful mount (app loaded fine)
-    try {
-      sessionStorage.removeItem(RELOAD_COUNT_KEY);
-    } catch {
-      // ignore
-    }
+    // Delay the counter reset so the guard is still active during hydration.
+    // If a chunk error fires within the first 5 s, the counter prevents looping.
+    // After 5 s of stable operation we reset so future navigations can recover.
+    const stableTimer = setTimeout(() => {
+      try {
+        sessionStorage.removeItem(RELOAD_COUNT_KEY);
+      } catch {
+        // ignore
+      }
+    }, STABLE_DELAY_MS);
 
     const handleError = (event: ErrorEvent) => {
       const msg = event?.message || '';
@@ -141,6 +150,7 @@ export default function ChunkErrorHandler() {
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
     return () => {
+      clearTimeout(stableTimer);
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
