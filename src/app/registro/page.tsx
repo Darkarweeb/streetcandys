@@ -69,6 +69,7 @@ export default function RegistroPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log("[REGISTER SUBMIT START]");
     e.preventDefault();
     setError('');
 
@@ -88,6 +89,7 @@ export default function RegistroPage() {
     setLoading(true);
     console.log('[registro] BEFORE calling signUp — email:', email);
     try {
+      console.log("[CALLING SIGNUP]", email);
       await signUp({ email, password, fullName, countryCode });
       console.log('[registro] AFTER signUp resolved — success, showing confirmation screen');
       setSuccess(true);
@@ -101,6 +103,7 @@ export default function RegistroPage() {
         console.warn('[registro] Welcome email request failed (non-fatal):', err);
       });
     } catch (err: unknown) {
+      console.log("[REGISTER OUTER CATCH]", err);
       console.log("REGISTRO CATCH RAW VALUE:", err);
       console.log("REGISTRO CATCH TYPE:", typeof err);
       console.log("REGISTRO CATCH KEYS:", Object.keys((err as any) || {}));
