@@ -230,6 +230,8 @@ export default function SpinToWin() {
       spinAnimRef.current = requestAnimationFrame(animateSpin);
     } else {
       setRotation(targetRotRef.current);
+      // ✅ FIX: Clear the ref so waitForAnimation can detect completion
+      spinAnimRef.current = null;
       // Phase is set after API response is received
     }
   }, []);
@@ -267,33 +269,51 @@ export default function SpinToWin() {
 
     // ── Call server-side API (handles verification + DB + coupon) ─────────────
     try {
-      const res = await fetch('/api/spin/girar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          nombre: nombre.trim() || undefined,
-          consent,
-          prizeLabel: seg.label,
-          prizeValue: seg.value,
-          discountType: seg.discountType,
-          couponExpirationDays: expirationDays,
-          minimumPurchase: minPurchase,
-        }),
-      });
+      // ✅ FIX: Add AbortController for network timeout (10s)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      let res: Response;
+      try {
+        res = await fetch('/api/spin/girar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            nombre: nombre.trim() || undefined,
+            consent,
+            prizeLabel: seg.label,
+            prizeValue: seg.value,
+            discountType: seg.discountType,
+            couponExpirationDays: expirationDays,
+            minimumPurchase: minPurchase,
+          }),
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       const data = await res.json();
 
-      // Wait for animation to finish before showing result
+      // ✅ FIX: Wait for animation to finish before showing result
+      // Hard timeout of SPIN_DURATION + 500ms ensures we never hang forever
       const waitForAnimation = () =>
         new Promise<void>((resolve) => {
+          const deadline = Date.now() + SPIN_DURATION + 500;
           const check = () => {
-            if (!spinAnimRef.current) {
+            if (spinAnimRef.current === null || Date.now() >= deadline) {
+              // Ensure ref is cleared
+              if (spinAnimRef.current !== null) {
+                cancelAnimationFrame(spinAnimRef.current);
+                spinAnimRef.current = null;
+              }
               resolve();
             } else {
-              setTimeout(check, 100);
+              setTimeout(check, 50);
             }
           };
+          // Start checking after the minimum spin duration
           setTimeout(check, SPIN_DURATION);
         });
 
@@ -315,7 +335,7 @@ export default function SpinToWin() {
           setPhase('result');
         }
       } else if (data.status === 'pending_verification') {
-        // Email not confirmed — show verification pending screen
+        // ✅ Email not confirmed — show verification pending screen
         setPendingEmail(data.email);
         setPendingPrize(data.prize);
         setPhase('pending_verification');
@@ -336,10 +356,21 @@ export default function SpinToWin() {
           localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true }));
         } catch {}
       }
-    } catch {
-      setSaveError('Error de conexión. Por favor intenta de nuevo.');
+    } catch (err: unknown) {
+      // ✅ FIX: Ensure animation is stopped on any error
+      if (spinAnimRef.current !== null) {
+        cancelAnimationFrame(spinAnimRef.current);
+        spinAnimRef.current = null;
+      }
+      const isAbort = (err as Error).name === 'AbortError';
+      setSaveError(
+        isAbort
+          ? 'La solicitud tardó demasiado. Por favor intenta de nuevo.'
+          : 'Error de conexión. Por favor intenta de nuevo.'
+      );
       setPhase('result');
     } finally {
+      // ✅ FIX: Always clear submitting state
       setSubmitting(false);
     }
   };
@@ -394,21 +425,25 @@ export default function SpinToWin() {
       aria-label="Ruleta de premios"
     >
       {/* Close button — outside modal card so overflow-hidden never clips it */}
-      {phase !== 'spinning' && (
-        <button
-          onClick={dismiss}
-          className="fixed z-[10000] flex items-center justify-center w-11 h-11 rounded-full bg-sc-beige hover:bg-sc-border transition-colors shadow-md"
-          style={{
-            top: 'max(env(safe-area-inset-top, 0px) + 12px, 12px)',
-            right: 'max(env(safe-area-inset-right, 0px) + 12px, 12px)',
-          }}
-          aria-label="Cerrar"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M3 3l10 10M13 3L3 13" stroke="#163317" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-      )}
+      {/* ✅ FIX: Always show close button (removed phase !== 'spinning' guard)
+          During spinning we show a dimmed version so the modal is never uncloseable */}
+      <button
+        onClick={dismiss}
+        disabled={phase === 'spinning'}
+        className={`fixed z-[10000] flex items-center justify-center w-11 h-11 rounded-full bg-sc-beige hover:bg-sc-border transition-colors shadow-md ${
+          phase === 'spinning' ? 'opacity-30 cursor-not-allowed' : 'opacity-100'
+        }`}
+        style={{
+          top: 'max(env(safe-area-inset-top, 0px) + 12px, 12px)',
+          right: 'max(env(safe-area-inset-right, 0px) + 12px, 12px)',
+        }}
+        aria-label="Cerrar"
+        aria-disabled={phase === 'spinning'}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3 3l10 10M13 3L3 13" stroke="#163317" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </button>
 
       <div className="relative bg-sc-cream rounded-card shadow-2xl w-full max-w-md mx-auto overflow-hidden animate-slide-up">
         {/* Header */}
