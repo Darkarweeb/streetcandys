@@ -12,9 +12,30 @@ import { useEffect } from 'react';
  * Symptom: TypeError: Cannot read properties of undefined (reading 'call')
  *          at webpack.js (originalFactory.call)
  *
- * Fix: Intercept the error, clear ALL caches (Cache API + localStorage Next.js
- * entries), and force a hard reload so the browser fetches the latest chunks.
+ * Fix: Intercept the error, clear ALL caches (Cache API + localStorage/sessionStorage
+ * Next.js entries), and force a hard reload so the browser fetches the latest chunks.
+ * A reload guard prevents infinite reload loops.
  */
+
+const RELOAD_COUNT_KEY = '__sc_chunk_reload_count__';
+const MAX_RELOADS = 2;
+
+function getReloadCount(): number {
+  try {
+    return parseInt(sessionStorage.getItem(RELOAD_COUNT_KEY) || '0', 10);
+  } catch {
+    return 0;
+  }
+}
+
+function incrementReloadCount(): void {
+  try {
+    const count = getReloadCount() + 1;
+    sessionStorage.setItem(RELOAD_COUNT_KEY, String(count));
+  } catch {
+    // sessionStorage not available
+  }
+}
 
 function clearAllNextCaches() {
   try {
@@ -46,6 +67,27 @@ function clearAllNextCaches() {
   } catch {
     // localStorage not available
   }
+
+  try {
+    const ss = window.sessionStorage;
+    const toRemove: string[] = [];
+    for (let i = 0; i < ss.length; i++) {
+      const key = ss.key(i);
+      if (
+        key &&
+        key !== RELOAD_COUNT_KEY &&
+        (key.includes('__RSC_') ||
+          key.includes('next-router') ||
+          key.includes('_next') ||
+          key.includes('__NEXT_'))
+      ) {
+        toRemove.push(key);
+      }
+    }
+    toRemove.forEach((k) => ss.removeItem(k));
+  } catch {
+    // sessionStorage not available
+  }
 }
 
 function isChunkError(msg: string): boolean {
@@ -58,14 +100,32 @@ function isChunkError(msg: string): boolean {
   );
 }
 
+function handleChunkError() {
+  const count = getReloadCount();
+  if (count >= MAX_RELOADS) {
+    // Stop reloading to prevent infinite loop — let the error surface
+    console.warn('[ChunkErrorHandler] Max reload attempts reached. Stopping reload loop.');
+    return;
+  }
+  incrementReloadCount();
+  clearAllNextCaches();
+  window.location.reload();
+}
+
 export default function ChunkErrorHandler() {
   useEffect(() => {
+    // Reset reload counter on successful mount (app loaded fine)
+    try {
+      sessionStorage.removeItem(RELOAD_COUNT_KEY);
+    } catch {
+      // ignore
+    }
+
     const handleError = (event: ErrorEvent) => {
       const msg = event?.message || '';
       if (isChunkError(msg)) {
         event.preventDefault();
-        clearAllNextCaches();
-        window.location.reload();
+        handleChunkError();
       }
     };
 
@@ -73,8 +133,7 @@ export default function ChunkErrorHandler() {
       const msg = String(event?.reason?.message || event?.reason || '');
       if (isChunkError(msg)) {
         event.preventDefault();
-        clearAllNextCaches();
-        window.location.reload();
+        handleChunkError();
       }
     };
 
