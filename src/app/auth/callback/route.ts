@@ -22,8 +22,18 @@ export async function GET(request: NextRequest) {
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
+
     if (!error) {
+      // If the callback is for email verification (next points to /email-verificado),
+      // redirect there so the user sees the success page.
+      // For all other flows (password reset, etc.) redirect to the requested path.
       return NextResponse.redirect(`${origin}${next}`);
+    }
+
+    // Token exchange failed — could be expired or already used
+    if (next === '/email-verificado') {
+      // Email verification link was invalid/expired — show friendly error page
+      return NextResponse.redirect(`${origin}/verificar-email?error=enlace-invalido`);
     }
   }
 

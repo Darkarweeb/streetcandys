@@ -222,14 +222,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const resendConfirmationEmail = async (email: string) => {
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email,
-      options: {
-        emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback`,
-      },
+    // Call our unified welcome/verification endpoint which generates a fresh
+    // Supabase verification link and sends it via Resend (not Supabase's own email).
+    const res = await fetch('/api/email/resend-verification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     });
-    if (error) throw error;
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error || 'No se pudo reenviar el correo de verificación.');
+    }
   };
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';

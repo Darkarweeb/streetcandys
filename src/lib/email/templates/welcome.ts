@@ -6,10 +6,41 @@
 export interface WelcomeEmailData {
   fullName: string;
   email: string;
+  verificationLink?: string;
 }
 
-export function getWelcomeEmailHtml({ fullName }: WelcomeEmailData): string {
+export function getWelcomeEmailHtml({ fullName, verificationLink }: WelcomeEmailData): string {
   const firstName = fullName?.split(' ')[0] || 'Amigo';
+
+  const verifySection = verificationLink
+    ? `
+              <!-- Verification Banner -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;border-radius:16px;overflow:hidden;border:2px solid #e91e8c;">
+                <tr>
+                  <td style="background:linear-gradient(135deg,#e91e8c 0%,#ff69b4 100%);padding:16px 24px;text-align:center;">
+                    <p style="margin:0;font-size:15px;font-weight:900;color:#ffffff;letter-spacing:-0.3px;">✉️ Verifica tu correo para activar tu cuenta</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background:#fff8fb;padding:20px 24px;text-align:center;">
+                    <p style="margin:0 0 16px;font-size:13px;color:#555;line-height:1.6;">
+                      Tu cuenta en <strong style="color:#e91e8c;">Street Candy's</strong> no estará activa hasta que confirmes tu correo electrónico.
+                      Haz clic en el botón de abajo para verificar tu dirección y empezar a disfrutar todos los beneficios del crew.
+                    </p>
+                    <a href="${verificationLink}"
+                       style="display:inline-block;background:linear-gradient(135deg,#e91e8c 0%,#ff69b4 100%);color:#ffffff;font-size:16px;font-weight:900;text-decoration:none;padding:16px 40px;border-radius:50px;letter-spacing:0.3px;box-shadow:0 4px 16px rgba(233,30,140,0.35);">
+                      ✅ Verificar mi correo
+                    </a>
+                    <p style="margin:16px 0 0;font-size:11px;color:#aaa;line-height:1.6;">
+                      Este enlace expira en 24 horas. Si no creaste esta cuenta, ignora este correo.<br/>
+                      Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>
+                      <a href="${verificationLink}" style="color:#e91e8c;word-break:break-all;font-size:11px;">${verificationLink}</a>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+    `
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -46,6 +77,8 @@ export function getWelcomeEmailHtml({ fullName }: WelcomeEmailData): string {
 
               <!-- Divider -->
               <hr style="border:none;border-top:1.5px solid #ffd6e8;margin:0 0 24px;" />
+
+              ${verifySection}
 
               <!-- Benefits -->
               <p style="margin:0 0 16px;font-size:14px;font-weight:700;color:#1a1a1a;text-transform:uppercase;letter-spacing:0.5px;">Lo que te espera en el crew:</p>
@@ -153,12 +186,16 @@ export function getWelcomeEmailHtml({ fullName }: WelcomeEmailData): string {
 </html>`;
 }
 
-export function getWelcomeEmailText({ fullName }: WelcomeEmailData): string {
+export function getWelcomeEmailText({ fullName, verificationLink }: WelcomeEmailData): string {
   const firstName = fullName?.split(' ')[0] || 'Amigo';
+  const verifyBlock = verificationLink
+    ? `\n⚠️ IMPORTANTE: Debes verificar tu correo para activar tu cuenta.\nHaz clic aquí para verificar: ${verificationLink}\n(Este enlace expira en 24 horas)\n`
+    : '';
+
   return `¡Bienvenido al Crew, ${firstName}!
 
 Tu cuenta en Street Candy's ha sido creada exitosamente.
-
+${verifyBlock}
 Lo que te espera:
 🏆 Programa de Recompensas — Acumula puntos en cada compra
 🎁 Descuentos Exclusivos — Ofertas solo para miembros del crew
