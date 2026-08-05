@@ -125,7 +125,7 @@ export default function RootLayout({
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){var _o=window.onerror;window.onerror=function(m,s,l,c,e){var ms=String(m||'');if(ms.indexOf('originalFactory.call')!==-1||ms.indexOf("reading 'call'")!==-1||ms.indexOf('Loading chunk')!==-1||ms.indexOf('ChunkLoadError')!==-1){try{if(window.caches){window.caches.keys().then(function(k){k.forEach(function(n){window.caches.delete(n);});});}}catch(ex){}window.location.reload();return true;}if(_o)return _o.apply(this,arguments);};})();`,
+            __html: `(function(){var _o=window.onerror;window.onerror=function(m,s,l,c,e){var ms=String(m||'');if(ms.indexOf('originalFactory.call')!==-1||ms.indexOf("reading 'call'")!==-1||ms.indexOf('Loading chunk')!==-1||ms.indexOf('ChunkLoadError')!==-1){try{if(window.caches){window.caches.keys().then(function(k){k.forEach(function(n){window.caches.delete(n);});});}var ls=window.localStorage;if(ls){var i=0;while(i<ls.length){var k=ls.key(i);if(k&&(k.indexOf('__RSC_')!==-1||k.indexOf('next-router')!==-1||k.indexOf('_next')!==-1)){ls.removeItem(k);}else{i++;}}}}catch(ex){}window.location.reload(true);return true;}if(_o)return _o.apply(this,arguments);};window.addEventListener('unhandledrejection',function(ev){var ms=String(ev&&ev.reason&&ev.reason.message||ev&&ev.reason||'');if(ms.indexOf('originalFactory.call')!==-1||ms.indexOf("reading 'call'")!==-1||ms.indexOf('Loading chunk')!==-1||ms.indexOf('ChunkLoadError')!==-1){ev.preventDefault();try{if(window.caches){window.caches.keys().then(function(k){k.forEach(function(n){window.caches.delete(n);});});}}catch(ex){}window.location.reload(true);}});})();`,
           }}
         />
 
