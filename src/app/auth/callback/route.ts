@@ -19,68 +19,44 @@ export async function GET(request: NextRequest) {
   const tokenHash = searchParams.get('token_hash');
   const type = searchParams.get('type') as EmailOtpType | null;
   const nextParam = searchParams.get('next') ?? '/cuenta';
-
-  // Validate the redirect target to prevent open redirect attacks
   const next = isSafeRedirectPath(nextParam) ? nextParam : '/cuenta';
 
-  const supabase = await createClient();
-
-  // ── Path A: token_hash flow (used by generateLink / action_link) ──────────
+  // ── Path A: token_hash flow (PKCE — used by password recovery action_link) ──
   if (tokenHash && type) {
-    const verifyResult = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
-    const { data: verifyData, error } = verifyResult;
+    const supabase = await createClient();
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
 
     if (!error) {
-      // SUCCESS — continue normal redirect
-      if (type === 'signup') {
-        return NextResponse.redirect(`${origin}/email-verificado`);
+      if (type === 'recovery') {
+        return NextResponse.redirect(`${origin}/nueva-contrasena`);
       }
-      return NextResponse.redirect(`${origin}${next}`);
+      // signup via token_hash — session is now in cookies, go to /cuenta
+      return NextResponse.redirect(`${origin}/cuenta`);
     }
 
-    // ── TEMPORARY DEBUG: return JSON instead of redirecting on failure ──────
-    const redirectUrlThatWouldHaveBeenUsed =
-      type === 'signup'
-        ? `${origin}/email-verificado`
-        : `${origin}${next}`;
-
-    return NextResponse.json(
-      {
-        debug: true,
-        token_hash_received: tokenHash,
-        type_received: type,
-        verifyOtp_error_code: (error as { code?: string }).code ?? null,
-        verifyOtp_error_message: error.message ?? null,
-        verifyOtp_status: (error as { status?: number }).status ?? null,
-        verifyOtp_full_response: {
-          data: verifyData,
-          error: {
-            name: error.name,
-            message: error.message,
-            status: (error as { status?: number }).status ?? null,
-            code: (error as { code?: string }).code ?? null,
-          },
-        },
-        redirect_url_that_would_have_been_used: redirectUrlThatWouldHaveBeenUsed,
-      },
-      { status: 200 }
-    );
-    // ── END TEMPORARY DEBUG ─────────────────────────────────────────────────
+    // verifyOtp failed — send to login with error
+    return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
   }
 
-  // ── Path B: PKCE code flow (OAuth, magic link, password reset) ────────────
+  // ── Path B: PKCE code flow (OAuth, magic link) ────────────────────────────
   if (code) {
+    const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
 
-    if (next === '/email-verificado') {
-      return NextResponse.redirect(`${origin}/verificar-email?error=enlace-invalido`);
-    }
+    return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
   }
 
-  // Fallback — no valid params
-  return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
+  // ── Path C: Implicit flow — session arrives in URL hash (browser-only) ────
+  // The hash fragment is never sent to the server. Forward to the client-side
+  // handler which will read window.location.hash and call setSession().
+  // Preserve the ?next= param so the client page knows where to redirect.
+  const clientUrl = new URL(`${origin}/auth/confirmar`);
+  if (nextParam && isSafeRedirectPath(nextParam)) {
+    clientUrl.searchParams.set('next', nextParam);
+  }
+  return NextResponse.redirect(clientUrl.toString());
 }

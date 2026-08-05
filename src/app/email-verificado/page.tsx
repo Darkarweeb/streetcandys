@@ -1,10 +1,58 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
+import { createClient } from '@/lib/supabase/client';
 
 export default function EmailVerificadoPage() {
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    async function checkAndRedirect() {
+      // Give the auth state a moment to settle (setSession may have just fired)
+      await new Promise((r) => setTimeout(r, 800));
+
+      const { data: { session } } = await supabase?.auth?.getSession();
+
+      if (session) {
+        // Session is active — go straight to the account dashboard
+        router?.replace('/cuenta');
+        return;
+      }
+
+      // No session yet — show the page so the user can log in manually
+      setChecking(false);
+    }
+
+    checkAndRedirect();
+  }, [router]);
+
+  if (checking) {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center px-4"
+        style={{ background: 'linear-gradient(135deg, #fff0f5 0%, #ffe4ef 60%, #ffd6e8 100%)' }}
+      >
+        <div className="text-center">
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
+            style={{ background: 'linear-gradient(135deg, #e91e8c 0%, #ff69b4 100%)' }}
+          >
+            <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-lg font-semibold" style={{ color: '#1a1a1a' }}>
+            Verificando tu cuenta…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-4 py-16"
