@@ -163,23 +163,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       },
     });
 
-    if (error) {
-      // Always throw a proper Error with a human-readable message
-      const msg = (error as { message?: string })?.message;
-      throw new Error(msg || 'Error al registrarse. Intenta de nuevo.');
-    }
+    if (error) throw error;
 
-    // Supabase silently returns a fake user when the email is already registered
-    // (to prevent user enumeration). Detect this via the empty identities array.
-    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-      throw new Error('Este correo ya está registrado. ¿Quieres iniciar sesión?');
-    }
+    // If profile wasn't auto-created by trigger, create it manually
+    if (data.user) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: data.user.id,
+          email,
+          full_name: fullName,
+          country_code: countryCode,
+          role: 'customer',
+          age_verified: false,
+          is_active: true,
+        }, { onConflict: 'id' });
 
-    // Profile creation is handled entirely by the handle_new_user DB trigger.
-    // DO NOT attempt a client-side upsert here — the user has no session yet
-    // (email confirmation is pending), so RLS will block any authenticated write,
-    // and the anon key has no INSERT permission on profiles.
-    // The trigger runs SECURITY DEFINER and always succeeds independently.
+      // Non-fatal: trigger may have already created it
+      if (profileError && profileError.code !== '23505') {
+        console.warn('Perfil no pudo crearse automáticamente:', profileError.message);
+      }
+    }
   };
 
   const signIn = async (email: string, password: string) => {

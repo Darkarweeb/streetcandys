@@ -7,12 +7,10 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import Navigation from '@/components/Navigation';
 import AnnouncementBar from '@/components/AnnouncementBar';
-import StrategicPartnersSection from '@/components/StrategicPartnersSection';
 import type { ProductSummary, CategoryWithChildren } from '@/lib/products/types';
 import { formatPrice, formatPriceValue, isProductAvailableInCountry, type Country } from '@/lib/price';
 import { useCartPersistence } from '@/hooks/useCartPersistence';
 import { getBlogImageProps } from '@/lib/blog/blog-image-utils';
-
 
 const COUNTRY_KEY = 'sc_country';
 
@@ -1595,7 +1593,7 @@ export default function HomePage() {
   return (
     <>
       {/* SEO meta — injected via head in layout, but we set title here */}
-      <div suppressHydrationWarning className="min-h-screen bg-sc-cream font-sans text-sc-forest overflow-x-hidden">
+      <div className="min-h-screen bg-sc-cream font-sans text-sc-forest overflow-x-hidden">
         <AnnouncementBar />
         <Navigation
           cartCount={cartCount}
@@ -1604,7 +1602,7 @@ export default function HomePage() {
           onCountryChange={handleCountryChange}
         />
 
-        <main suppressHydrationWarning id="main-content">
+        <main id="main-content">
           {/* 1. Hero */}
           <HeroSection country={country} onShopNow={scrollToFeatured} />
 
@@ -1632,19 +1630,16 @@ export default function HomePage() {
           {/* 9. Blog Preview */}
           <BlogPreview />
 
-          {/* 10. Strategic Partners / Aliados */}
-          <StrategicPartnersSection country={country} />
-
-          {/* 11. Customer Reviews */}
+          {/* 10. Customer Reviews */}
           <CustomerReviews />
 
-          {/* 12. Newsletter */}
+          {/* 11. Newsletter */}
           <NewsletterSection country={country} />
 
-          {/* 13. FAQ */}
+          {/* 12. FAQ */}
           <FAQSection />
 
-          {/* 14. Instagram / Social */}
+          {/* 13. Instagram / Social */}
           <SocialSection />
         </main>
 

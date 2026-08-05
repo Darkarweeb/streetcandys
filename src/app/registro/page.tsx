@@ -99,13 +99,8 @@ export default function RegistroPage() {
         console.warn('[registro] Welcome email request failed (non-fatal):', err);
       });
     } catch (err: unknown) {
-      let msg = 'Error al crear la cuenta. Intenta de nuevo.';
-      if (err instanceof Error && err.message) {
-        msg = err.message;
-      } else if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string' && (err as { message: string }).message) {
-        msg = (err as { message: string }).message;
-      }
-      if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('User already registered')) {
+      const msg = err instanceof Error ? err.message : 'Error al crear la cuenta.';
+      if (msg.includes('already registered') || msg.includes('already exists')) {
         setError('Este correo ya está registrado. ¿Quieres iniciar sesión?');
       } else {
         setError(msg);
