@@ -150,38 +150,54 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw new Error('Street Candy solo está disponible en Colombia y Costa Rica.');
     }
 
-    console.log('[signUp] Before signUp', { email, fullName, countryCode });
+    console.log('[signUp] BEFORE calling supabase.auth.signUp — email:', email);
     console.log('[signUp] Calling supabase.auth.signUp()');
 
-    const rawResponse = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          country_code: countryCode,
-          role: 'customer',
+    let rawResponse: Awaited<ReturnType<typeof supabase.auth.signUp>>;
+    try {
+      rawResponse = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            country_code: countryCode,
+            role: 'customer',
+          },
+          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback`,
         },
-        emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback`,
-      },
-    });
+      });
+    } catch (networkErr: unknown) {
+      console.error('[signUp] NETWORK/THROW ERROR from supabase.auth.signUp():');
+      console.error('  typeof error         :', typeof networkErr);
+      console.error('  String(error)        :', String(networkErr));
+      console.error('  error?.message       :', (networkErr as any)?.message);
+      console.error('  JSON.stringify(error):', JSON.stringify(networkErr, Object.getOwnPropertyNames(networkErr as object)));
+      console.error('  full error obj       :', networkErr);
+      throw new Error((networkErr as any)?.message || 'Error de red al crear la cuenta.');
+    }
 
     const { data, error } = rawResponse;
 
-    console.log('[signUp] After signUp');
+    console.log('[signUp] AFTER supabase.auth.signUp() resolved');
     console.log('[signUp] RAW RESPONSE:', JSON.stringify(rawResponse, null, 2));
 
     if (error) {
       console.error('[signUp] ERROR DETAILS:');
-      console.error('  error.message :', error.message);
-      console.error('  error.code    :', (error as any).code);
-      console.error('  error.details :', (error as any).details);
-      console.error('  error.hint    :', (error as any).hint);
-      console.error('  error.status  :', (error as any).status);
-      console.error('  error.name    :', error.name);
-      console.error('  full error obj:', error);
+      console.error('  typeof error         :', typeof error);
+      console.error('  String(error)        :', String(error));
+      console.error('  error?.message       :', error?.message);
+      console.error('  JSON.stringify(error):', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+      console.error('  error.code           :', (error as any).code);
+      console.error('  error.details        :', (error as any).details);
+      console.error('  error.hint           :', (error as any).hint);
+      console.error('  error.status         :', (error as any).status);
+      console.error('  error.name           :', error.name);
+      console.error('  full error obj       :', error);
       throw new Error(error.message || 'Error al crear la cuenta.');
     }
+
+    console.log('[signUp] SUCCESS — user:', data.user?.id, '| email:', data.user?.email);
 
     // Profile is created automatically by the handle_new_user() SECURITY DEFINER trigger
     // on auth.users INSERT. No manual upsert needed — and it would fail anyway because

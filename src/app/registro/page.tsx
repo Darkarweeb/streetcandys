@@ -86,8 +86,10 @@ export default function RegistroPage() {
     }
 
     setLoading(true);
+    console.log('[registro] BEFORE calling signUp — email:', email);
     try {
       await signUp({ email, password, fullName, countryCode });
+      console.log('[registro] AFTER signUp resolved — success, showing confirmation screen');
       setSuccess(true);
 
       // Fire-and-forget welcome email — registration success is never blocked by this
@@ -99,11 +101,24 @@ export default function RegistroPage() {
         console.warn('[registro] Welcome email request failed (non-fatal):', err);
       });
     } catch (err: unknown) {
+      console.error('[registro] CATCH BLOCK — error details:');
+      console.error('  typeof error         :', typeof err);
+      console.error('  String(error)        :', String(err));
+      console.error('  error?.message       :', (err as any)?.message);
+      console.error('  JSON.stringify(error):', JSON.stringify(err, Object.getOwnPropertyNames(err as object)));
+      console.error('  full error obj       :', err);
+
+      const serialized = (() => {
+        try { return JSON.stringify(err, Object.getOwnPropertyNames(err as object), 2); } catch { return String(err); }
+      })();
+
       const msg = err instanceof Error ? err.message : 'Error al crear la cuenta.';
       if (msg.includes('already registered') || msg.includes('already exists')) {
         setError('Este correo ya está registrado. ¿Quieres iniciar sesión?');
+      } else if (msg && msg !== '{}') {
+        setError(`${msg}\n\n[DEBUG] ${serialized}`);
       } else {
-        setError(msg);
+        setError(`[DEBUG] Error serializado: ${serialized}`);
       }
     } finally {
       setLoading(false);
