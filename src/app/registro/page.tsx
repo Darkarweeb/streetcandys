@@ -7,6 +7,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { CountryCode } from '@/contexts/AuthContext';
 import AppLogo from '@/components/ui/AppLogo';
 
+// ─── TEMPORARY DEBUG TYPES ────────────────────────────────────────────────────
+interface SignupDebugCapture {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  bodyText: string;
+  bodyJson: unknown;
+  jsonParseError: string | null;
+  timestamp: string;
+  url: string;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const COUNTRIES = [
   { code: 'CO' as CountryCode, name: 'Colombia', flag: '🇨🇴' },
   { code: 'CR' as CountryCode, name: 'Costa Rica', flag: '🇨🇷' },
@@ -29,6 +42,10 @@ export default function RegistroPage() {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+
+  // ─── TEMPORARY DEBUG STATE ──────────────────────────────────────────────────
+  const [debugCapture, setDebugCapture] = useState<SignupDebugCapture | null>(null);
+  // ───────────────────────────────────────────────────────────────────────────
 
   const passwordStrength = (() => {
     if (password.length === 0) return 0;
@@ -87,7 +104,88 @@ export default function RegistroPage() {
     }
 
     setLoading(true);
+    setDebugCapture(null);
     console.log('[registro] BEFORE calling signUp — email:', email);
+
+    // ─── TEMPORARY DEBUG: intercept /auth/v1/signup fetch ─────────────────────
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const originalFetch = window.fetch.bind(window);
+
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+          ? input.href
+          : (input as Request).url;
+
+      const isSignupCall = url.includes('/auth/v1/signup');
+
+      if (!isSignupCall) {
+        return originalFetch(input, init);
+      }
+
+      console.log('[DEBUG INTERCEPTOR] Intercepted POST /auth/v1/signup');
+      console.log('[DEBUG INTERCEPTOR] Request URL:', url);
+      console.log('[DEBUG INTERCEPTOR] Request init:', JSON.stringify(init, null, 2));
+
+      // Execute the real fetch
+      const response = await originalFetch(input, init);
+
+      // Clone so we can read the body without consuming it
+      const cloned = response.clone();
+
+      const status = cloned.status;
+      const statusText = cloned.statusText;
+
+      // Capture all headers
+      const headers: Record<string, string> = {};
+      cloned.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+
+      // Read raw body text
+      let bodyText = '';
+      try {
+        bodyText = await cloned.text();
+      } catch (err) {
+        bodyText = `[Could not read body: ${String(err)}]`;
+      }
+
+      // Try to parse JSON
+      let bodyJson: unknown = null;
+      let jsonParseError: string | null = null;
+      try {
+        bodyJson = JSON.parse(bodyText);
+      } catch (err) {
+        jsonParseError = String(err);
+      }
+
+      const capture: SignupDebugCapture = {
+        status,
+        statusText,
+        headers,
+        bodyText,
+        bodyJson,
+        jsonParseError,
+        timestamp: new Date().toISOString(),
+        url,
+      };
+
+      console.log('[DEBUG INTERCEPTOR] ═══════════════════════════════════════');
+      console.log('[DEBUG INTERCEPTOR] HTTP Status:', status, statusText);
+      console.log('[DEBUG INTERCEPTOR] Headers:', headers);
+      console.log('[DEBUG INTERCEPTOR] Raw Body Text:', bodyText);
+      console.log('[DEBUG INTERCEPTOR] Parsed JSON:', bodyJson);
+      if (jsonParseError) console.log('[DEBUG INTERCEPTOR] JSON Parse Error:', jsonParseError);
+      console.log('[DEBUG INTERCEPTOR] ═══════════════════════════════════════');
+
+      setDebugCapture(capture);
+
+      return response;
+    };
+    // ─────────────────────────────────────────────────────────────────────────
+
     try {
       console.log("[CALLING SIGNUP]", email);
       await signUp({ email, password, fullName, countryCode });
@@ -115,6 +213,9 @@ export default function RegistroPage() {
         setError(msg || 'Error al crear la cuenta.');
       }
     } finally {
+      // ─── TEMPORARY DEBUG: restore original fetch ──────────────────────────
+      window.fetch = originalFetch;
+      // ─────────────────────────────────────────────────────────────────────
       setLoading(false);
     }
   };
@@ -147,6 +248,14 @@ export default function RegistroPage() {
         <Link href="/" className="mb-8 relative z-10">
           <AppLogo variant="light" height={52} />
         </Link>
+
+        {/* ─── TEMPORARY DEBUG PANEL (success screen) ─────────────────────── */}
+        {debugCapture && (
+          <div className="w-full max-w-2xl relative z-10 mb-6">
+            <DebugPanel capture={debugCapture} />
+          </div>
+        )}
+        {/* ─────────────────────────────────────────────────────────────────── */}
 
         <div className="w-full max-w-md relative z-10">
           <div className="bg-white rounded-3xl shadow-xl overflow-hidden" style={{ border: '1.5px solid #ffd6e8' }}>
@@ -247,6 +356,14 @@ export default function RegistroPage() {
       {/* Decorative circles */}
       <div className="fixed top-0 right-0 w-80 h-80 rounded-full pointer-events-none opacity-30" style={{ background: 'radial-gradient(circle, #ff69b4 0%, transparent 70%)', transform: 'translate(40%, -40%)' }} aria-hidden="true" />
       <div className="fixed bottom-0 left-0 w-64 h-64 rounded-full pointer-events-none opacity-20" style={{ background: 'radial-gradient(circle, #e91e8c 0%, transparent 70%)', transform: 'translate(-40%, 40%)' }} aria-hidden="true" />
+
+      {/* ─── TEMPORARY DEBUG PANEL (form screen) ────────────────────────────── */}
+      {debugCapture && (
+        <div className="w-full max-w-2xl relative z-10 mb-6">
+          <DebugPanel capture={debugCapture} />
+        </div>
+      )}
+      {/* ───────────────────────────────────────────────────────────────────── */}
 
       {/* Logo */}
       <Link href="/" className="mb-8 relative z-10">
@@ -478,3 +595,112 @@ export default function RegistroPage() {
     </div>
   );
 }
+
+// ─── TEMPORARY DEBUG COMPONENT ────────────────────────────────────────────────
+function DebugPanel({ capture }: { capture: SignupDebugCapture }) {
+  return (
+    <div
+      style={{
+        background: '#0d0d0d',
+        border: '2px solid #ff3b3b',
+        borderRadius: '12px',
+        padding: '16px',
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#f0f0f0',
+        wordBreak: 'break-all',
+        overflowX: 'auto',
+      }}
+    >
+      <div style={{ color: '#ff3b3b', fontWeight: 'bold', fontSize: '14px', marginBottom: '12px' }}>
+        🔍 DEBUG: Raw /auth/v1/signup Response
+      </div>
+
+      <div style={{ marginBottom: '10px' }}>
+        <span style={{ color: '#ffd700' }}>Timestamp:</span>{' '}
+        <span style={{ color: '#fff' }}>{capture.timestamp}</span>
+      </div>
+
+      <div style={{ marginBottom: '10px' }}>
+        <span style={{ color: '#ffd700' }}>URL:</span>{' '}
+        <span style={{ color: '#7ec8e3' }}>{capture.url}</span>
+      </div>
+
+      <div style={{ marginBottom: '10px' }}>
+        <span style={{ color: '#ffd700' }}>HTTP Status:</span>{' '}
+        <span
+          style={{
+            color: capture.status >= 200 && capture.status < 300 ? '#4ade80' : '#ff3b3b',
+            fontWeight: 'bold',
+            fontSize: '16px',
+          }}
+        >
+          {capture.status} {capture.statusText}
+        </span>
+      </div>
+
+      <div style={{ marginBottom: '10px' }}>
+        <div style={{ color: '#ffd700', marginBottom: '4px' }}>Response Headers:</div>
+        <div
+          style={{
+            background: '#1a1a1a',
+            borderRadius: '6px',
+            padding: '8px',
+            maxHeight: '150px',
+            overflowY: 'auto',
+          }}
+        >
+          {Object.entries(capture.headers).map(([k, v]) => (
+            <div key={k}>
+              <span style={{ color: '#ff69b4' }}>{k}</span>
+              <span style={{ color: '#888' }}>: </span>
+              <span style={{ color: '#e0e0e0' }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '10px' }}>
+        <div style={{ color: '#ffd700', marginBottom: '4px' }}>Raw Body Text:</div>
+        <div
+          style={{
+            background: '#1a1a1a',
+            borderRadius: '6px',
+            padding: '8px',
+            maxHeight: '200px',
+            overflowY: 'auto',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {capture.bodyText || '(empty)'}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '10px' }}>
+        <div style={{ color: '#ffd700', marginBottom: '4px' }}>
+          Parsed JSON:{' '}
+          {capture.jsonParseError && (
+            <span style={{ color: '#ff3b3b' }}>(parse error: {capture.jsonParseError})</span>
+          )}
+        </div>
+        <div
+          style={{
+            background: '#1a1a1a',
+            borderRadius: '6px',
+            padding: '8px',
+            maxHeight: '200px',
+            overflowY: 'auto',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {capture.bodyJson !== null
+            ? JSON.stringify(capture.bodyJson, null, 2)
+            : capture.jsonParseError
+            ? '(could not parse)'
+            : '(null)'}
+        </div>
+      </div>
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
