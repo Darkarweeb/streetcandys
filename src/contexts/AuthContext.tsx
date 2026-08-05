@@ -146,6 +146,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [fetchProfile]);
 
   const signUp = async ({ email, password, fullName, countryCode }: SignUpData) => {
+    console.log("[SIGNUP FUNCTION ENTERED]", email);
     if (!ALLOWED_COUNTRIES.includes(countryCode)) {
       throw new Error('Street Candy solo está disponible en Colombia y Costa Rica.');
     }
