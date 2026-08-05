@@ -12,6 +12,7 @@ import { formatPrice, formatPriceValue, isProductAvailableInCountry, type Countr
 import { useCartPersistence } from '@/hooks/useCartPersistence';
 import { getBlogImageProps } from '@/lib/blog/blog-image-utils';
 
+
 const COUNTRY_KEY = 'sc_country';
 
 // ─── Dynamic imports for below-fold heavy components ─────────────────────────
