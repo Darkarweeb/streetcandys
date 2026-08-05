@@ -74,12 +74,73 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Determine prize type mapped to DB enum ────────────────────────────────
-    // spin_leads.prize_type is free text (not an enum), coupons.discount_type must be 'percentage' | 'fixed'
+    // ── Verify email confirmation via Supabase Auth ───────────────────────────
+    // Uses the service-role admin API to look up the user by email and check
+    // email_confirmed_at. This is the authoritative source — NOT the profiles table.
+    const { data: usersPage, error: authLookupError } = await adminClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+    if (authLookupError) {
+      console.error('auth.admin.listUsers error:', authLookupError);
+      return NextResponse.json({ error: 'Error al verificar la cuenta' }, { status: 500 });
+    }
+
+    const authUser = usersPage?.users?.find(
+      (u) => u.email?.toLowerCase() === normalizedEmail
+    ) ?? null;
+
+    // email_confirmed_at must be a non-null, non-empty string for the email to be verified
+    const isEmailConfirmed = !!(authUser && authUser.email_confirmed_at);
+
+    if (!isEmailConfirmed) {
+      // ── Save pending lead (no coupon) ─────────────────────────────────────
+      const prizeType = discountType === 'shipping' ? 'free_shipping' : 'percentage';
+      const safeValue = prizeValue ?? 0;
+
+      const { error: pendingLeadError } = await adminClient.from('spin_leads').insert({
+        email: normalizedEmail,
+        first_name: nombre?.trim() || null,
+        marketing_consent: consent,
+        prize_label: prizeLabel,
+        prize_type: prizeType,
+        prize_value: safeValue,
+        coupon_id: null,
+        coupon_code: null,
+        ip_address: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? null,
+        user_agent: req.headers.get('user-agent') ?? null,
+        user_id: authUser?.id ?? null,
+        verification_status: 'pending',
+        verified_at: null,
+      });
+
+      if (pendingLeadError) {
+        // Unique constraint — race condition, treat as already_spun
+        if (pendingLeadError.code === '23505') {
+          return NextResponse.json(
+            { error: 'already_spun', message: 'Este correo ya participó en la ruleta.' },
+            { status: 409 }
+          );
+        }
+        console.error('spin_leads pending insert error:', pendingLeadError);
+        // Still return pending_verification even if DB insert fails
+      }
+
+      return NextResponse.json({
+        status: 'pending_verification',
+        email: normalizedEmail,
+        prize: prizeLabel,
+        message: authUser
+          ? 'Tu correo aún no ha sido confirmado. Revisa tu bandeja de entrada y confirma tu cuenta para recibir tu cupón.'
+          : 'No encontramos una cuenta con este correo. Regístrate y confirma tu correo para recibir tu cupón.',
+      });
+    }
+
+    // ── Email is confirmed — proceed to create coupon ─────────────────────────
     const prizeType = discountType === 'shipping' ? 'free_shipping' : 'percentage';
     const safeValue = prizeValue ?? 0;
 
-    // ── Generate coupon ───────────────────────────────────────────────────────
     const couponCode = generateCouponCode();
     const expiryDays = couponExpirationDays > 0 ? couponExpirationDays : 7;
     const expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000).toISOString();
@@ -87,7 +148,6 @@ export async function POST(req: NextRequest) {
     // coupons.discount_type CHECK: 'percentage' | 'fixed'
     // coupons.discount_value CHECK: > 0
     const couponDiscountType = discountType === 'shipping' ? 'fixed' : 'percentage';
-    // For free shipping use a symbolic 1 unit value (discount_value must be > 0)
     const couponDiscountValue = discountType === 'shipping' ? 1 : Math.max(safeValue, 1);
 
     const { data: couponData, error: couponError } = await adminClient
@@ -114,7 +174,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Error al generar el cupón' }, { status: 500 });
     }
 
-    // ── Insert spin lead record ───────────────────────────────────────────────
+    // ── Insert verified spin lead record ──────────────────────────────────────
     const { error: leadError } = await adminClient.from('spin_leads').insert({
       email: normalizedEmail,
       first_name: nombre?.trim() || null,
@@ -126,7 +186,7 @@ export async function POST(req: NextRequest) {
       coupon_code: couponCode,
       ip_address: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? null,
       user_agent: req.headers.get('user-agent') ?? null,
-      user_id: null,
+      user_id: authUser.id,
       verification_status: 'verified',
       verified_at: new Date().toISOString(),
     });
