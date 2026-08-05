@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
         type: 'signup',
         email,
         options: {
-          redirectTo: `${siteUrl}/auth/callback?next=/email-verificado`,
+          redirectTo: `${siteUrl}/auth/callback`,
         },
       });
 

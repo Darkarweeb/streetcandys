@@ -23,6 +23,15 @@ export async function GET(request: NextRequest) {
   // Validate the redirect target to prevent open redirect attacks
   const next = isSafeRedirectPath(nextParam) ? nextParam : '/cuenta';
 
+  // ── Temporary logging — remove after verification ─────────────────────────
+  console.log('[auth/callback] params received:', {
+    token_hash: tokenHash ?? '(none)',
+    type: type ?? '(none)',
+    code: code ? '(present)' : '(none)',
+    next,
+  });
+  // ─────────────────────────────────────────────────────────────────────────
+
   const supabase = await createClient();
 
   // ── Path A: token_hash flow (used by generateLink / action_link) ──────────
@@ -30,16 +39,26 @@ export async function GET(request: NextRequest) {
   // Supabase redirects to redirectTo with ?token_hash=...&type=signup
   // This MUST be consumed via verifyOtp — NOT exchangeCodeForSession.
   if (tokenHash && type) {
-    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    const { data: verifyData, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+
+    // ── Temporary logging — remove after verification ───────────────────────
+    console.log('[auth/callback] verifyOtp result:', {
+      error: error ? error.message : null,
+      user_id: verifyData?.user?.id ?? null,
+      email_confirmed_at: verifyData?.user?.email_confirmed_at ?? null,
+    });
+    // ───────────────────────────────────────────────────────────────────────
 
     if (!error) {
+      // For signup confirmations, always redirect to the verified page
+      if (type === 'signup') {
+        return NextResponse.redirect(`${origin}/email-verificado`);
+      }
+      // For recovery and other flows, use the next param
       return NextResponse.redirect(`${origin}${next}`);
     }
 
     // Token invalid or already used
-    if (next === '/email-verificado') {
-      return NextResponse.redirect(`${origin}/verificar-email?error=enlace-invalido`);
-    }
     return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
   }
 
