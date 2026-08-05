@@ -87,7 +87,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${origin}/cuenta`);
     }
 
-    return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
+    return NextResponse.redirect(
+      `${origin}/iniciar-sesion?error=enlace-invalido&branch=path-b-token_hash&params=${encodeURIComponent(paramNames.join(','))}`
+    );
   }
 
   // ── Path C: PKCE code flow (OAuth, magic link) ────────────────────────────
@@ -99,7 +101,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${origin}${next}`);
     }
 
-    return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
+    return NextResponse.redirect(
+      `${origin}/iniciar-sesion?error=enlace-invalido&branch=path-c-code&params=${encodeURIComponent(paramNames.join(','))}`
+    );
   }
 
   // ── Path D: Implicit flow — session arrives in URL hash (browser-only) ────
@@ -109,5 +113,7 @@ export async function GET(request: NextRequest) {
   if (nextParam && isSafeRedirectPath(nextParam)) {
     clientUrl.searchParams.set('next', nextParam);
   }
+  clientUrl.searchParams.set('branch', 'path-d-confirmar');
+  clientUrl.searchParams.set('params', paramNames.join(','));
   return NextResponse.redirect(clientUrl.toString());
 }
