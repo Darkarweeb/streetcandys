@@ -163,33 +163,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       },
     });
 
-    if (error) throw new Error(error.message || 'Error al registrarse. Intenta de nuevo.');
-
-    // If profile wasn't auto-created by trigger, create it manually
-    // Wrapped in try-catch: the DB trigger (SECURITY DEFINER) handles this;
-    // the client-side upsert may fail with RLS if the session isn't ready yet — non-fatal.
-    if (data.user) {
-      try {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: data.user.id,
-            email,
-            full_name: fullName,
-            country_code: countryCode,
-            role: 'customer',
-            age_verified: false,
-            is_active: true,
-          }, { onConflict: 'id' });
-
-        if (profileError && profileError.code !== '23505') {
-          console.warn('Perfil no pudo crearse automáticamente:', profileError.message);
-        }
-      } catch (profileEx) {
-        // Non-fatal: the DB trigger will have already created the profile
-        console.warn('Profile upsert skipped (trigger handles it):', profileEx);
-      }
+    if (error) {
+      // Always throw a proper Error with a human-readable message
+      const msg = (error as { message?: string })?.message;
+      throw new Error(msg || 'Error al registrarse. Intenta de nuevo.');
     }
+
+    // Supabase silently returns a fake user when the email is already registered
+    // (to prevent user enumeration). Detect this via the empty identities array.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      throw new Error('Este correo ya está registrado. ¿Quieres iniciar sesión?');
+    }
+
+    // Profile creation is handled entirely by the handle_new_user DB trigger.
+    // DO NOT attempt a client-side upsert here — the user has no session yet
+    // (email confirmation is pending), so RLS will block any authenticated write,
+    // and the anon key has no INSERT permission on profiles.
+    // The trigger runs SECURITY DEFINER and always succeeds independently.
   };
 
   const signIn = async (email: string, password: string) => {
