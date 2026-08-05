@@ -26,7 +26,7 @@ GRANT EXECUTE ON FUNCTION public.validate_promotion_coupon(TEXT, NUMERIC, TEXT, 
 GRANT EXECUTE ON FUNCTION public.get_eligible_promotions(NUMERIC, TEXT, UUID, UUID[], UUID[], TEXT)
   TO anon, authenticated;
 
-GRANT EXECUTE ON FUNCTION public.is_allowed_country(TEXT)
+GRANT EXECUTE ON FUNCTION public.is_allowed_country(CHAR(2))
   TO anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.get_product_rating_summary(UUID)

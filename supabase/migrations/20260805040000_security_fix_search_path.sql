@@ -20,7 +20,7 @@ ALTER FUNCTION public.assign_order_number()
 ALTER FUNCTION public.has_purchased_product(UUID, UUID)
   SET search_path = public, pg_temp;
 
-ALTER FUNCTION public.is_allowed_country(TEXT)
+ALTER FUNCTION public.is_allowed_country(CHAR(2))
   SET search_path = public, pg_temp;
 
 ALTER FUNCTION public.handle_new_user()
