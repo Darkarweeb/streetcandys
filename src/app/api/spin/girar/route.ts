@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     // ── Check if email already spun ───────────────────────────────────────────
     const { data: existingLead } = await adminClient
       .from('spin_leads')
-      .select('id, coupon_code, prize, verification_status')
+      .select('id, coupon_code, prize_label, verification_status')
       .eq('email', normalizedEmail)
       .maybeSingle();
 
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
         {
           error: 'already_spun',
           message: 'Este correo ya participó en la ruleta.',
-          existingPrize: existingLead.prize,
+          existingPrize: existingLead.prize_label,
           existingCoupon: existingLead.coupon_code,
           verificationStatus: existingLead.verification_status,
         },
@@ -106,6 +106,8 @@ export async function POST(req: NextRequest) {
       first_name: nombre?.trim() || null,
       marketing_consent: consent,
       prize_label: prizeLabel,
+      prize_type: discountType === 'shipping' ? 'free_shipping' : 'percentage',
+      prize_value: prizeValue ?? 0,
       coupon_code: emailConfirmed ? couponCode : null,
       user_id: userId,
       verification_status: verificationStatus,
