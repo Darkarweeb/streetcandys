@@ -1511,6 +1511,102 @@ function SocialSection() {
   );
 }
 
+// ─── PARTNERS SECTION ─────────────────────────────────────────────────────────
+interface PartnerLogo {
+  id: string;
+  name: string;
+  logo_url: string;
+  website_url: string | null;
+  sort_order: number;
+}
+
+function PartnersSection() {
+  const [partners, setPartners] = useState<PartnerLogo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/partners')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.exito) setPartners(data.datos ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (!loading && partners.length === 0) return null;
+
+  return (
+    <section
+      id="marcas-aliadas"
+      className="py-14 lg:py-20 bg-sc-beige border-t border-sc-border/30"
+      aria-labelledby="partners-title"
+    >
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
+        <div className="text-center mb-10">
+          <p className="text-sc-forest/60 text-xs font-bold uppercase tracking-widest mb-2">
+            Nuestros aliados
+          </p>
+          <h2
+            id="partners-title"
+            className="text-sc-forest font-black text-2xl lg:text-3xl tracking-tightest leading-none"
+          >
+            Marcas Aliadas
+          </h2>
+        </div>
+
+        {loading ? (
+          <div className="flex flex-wrap justify-center gap-6 lg:gap-10">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="w-28 h-16 bg-sc-cream/60 rounded-xl animate-pulse"
+                aria-hidden="true"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-center gap-6 lg:gap-10">
+            {partners.map((partner) =>
+              partner.website_url ? (
+                <a
+                  key={partner.id}
+                  href={partner.website_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center justify-center w-28 h-16 lg:w-36 lg:h-20 bg-white rounded-xl border border-sc-border/40 px-4 py-3 hover:border-sc-forest/30 hover:shadow-sm transition-all duration-200"
+                  aria-label={`Visitar sitio de ${partner.name}`}
+                  title={partner.name}
+                >
+                  <img
+                    src={partner.logo_url}
+                    alt={`Logo de ${partner.name}`}
+                    className="max-w-full max-h-full object-contain opacity-70 group-hover:opacity-100 transition-opacity duration-200"
+                    loading="lazy"
+                  />
+                </a>
+              ) : (
+                <div
+                  key={partner.id}
+                  className="flex items-center justify-center w-28 h-16 lg:w-36 lg:h-20 bg-white rounded-xl border border-sc-border/40 px-4 py-3"
+                  title={partner.name}
+                >
+                  <img
+                    src={partner.logo_url}
+                    alt={`Logo de ${partner.name}`}
+                    className="max-w-full max-h-full object-contain opacity-70"
+                    loading="lazy"
+                  />
+                </div>
+              ),
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── HOMEPAGE ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const { user, profile } = useAuth();
@@ -1639,7 +1735,10 @@ export default function HomePage() {
           {/* 12. FAQ */}
           <FAQSection />
 
-          {/* 13. Instagram / Social */}
+          {/* 13. Partners / Allied Brands */}
+          <PartnersSection />
+
+          {/* 14. Instagram / Social */}
           <SocialSection />
         </main>
 
