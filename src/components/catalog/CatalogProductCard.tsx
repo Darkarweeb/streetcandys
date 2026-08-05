@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductSummary } from '@/lib/products/types';
@@ -73,6 +73,25 @@ export default function CatalogProductCard({ product, onAddToCart, country = 'CO
       ? formatPrice({ base_price: product.compare_at_price!, price_crc: null }, country)
       : null;
 
+  // Add to cart state
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [addedToCart, setAddedToCart] = useState(false);
+
+  const handleAddToCart = () => {
+    if (addingToCart || addedToCart || !inStock) return;
+    setAddingToCart(true);
+    onAddToCart?.(product);
+    // Brief success state
+    setTimeout(() => {
+      setAddingToCart(false);
+      setAddedToCart(true);
+      setTimeout(() => setAddedToCart(false), 1800);
+    }, 400);
+  };
+
+  // Image loading state
+  const [imgLoaded, setImgLoaded] = useState(false);
+
   if (!available) return null;
 
   return (
@@ -81,14 +100,28 @@ export default function CatalogProductCard({ product, onAddToCart, country = 'CO
         {/* Image */}
         <div className="relative rounded-card overflow-hidden mb-3 bg-sc-beige aspect-square">
           {mainImage ? (
-            <Image
-              src={mainImage}
-              alt={mainAlt}
-              fill
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
-            />
+            <>
+              {/* Skeleton while loading */}
+              {!imgLoaded && (
+                <div className="absolute inset-0 bg-sc-beige animate-pulse z-10 flex items-center justify-center">
+                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="text-sc-border opacity-50" aria-hidden="true">
+                    <rect x="2" y="2" width="28" height="28" rx="4" stroke="currentColor" strokeWidth="1.5"/>
+                    <circle cx="11" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M2 22l8-6 6 5 4-3 10 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              )}
+              <Image
+                src={mainImage}
+                alt={mainAlt}
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                className={`object-cover transition-all duration-500 group-hover:scale-105 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                loading="lazy"
+                onLoad={() => setImgLoaded(true)}
+                onError={() => setImgLoaded(true)}
+              />
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-sc-beige">
               <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="text-sc-border" aria-hidden="true">
@@ -100,7 +133,7 @@ export default function CatalogProductCard({ product, onAddToCart, country = 'CO
           )}
 
           {/* Badges */}
-          <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+          <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-20">
             {product.is_featured && (
               <span className="bg-sc-forest text-sc-cream text-[10px] font-bold px-2.5 py-1 rounded-badge leading-none">
                 Destacado
@@ -124,13 +157,13 @@ export default function CatalogProductCard({ product, onAddToCart, country = 'CO
           </div>
 
           {/* Favorite button */}
-          <div className="absolute top-3 right-3">
+          <div className="absolute top-3 right-3 z-20">
             <FavoriteButton productId={product.id} size="sm" />
           </div>
 
           {/* Effects overlay */}
           {product.effects && product.effects.length > 0 && (
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-3 py-2">
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-3 py-2 z-20">
               <span className="text-white text-xs font-medium capitalize">
                 {product.effects[0]}
               </span>
@@ -178,16 +211,29 @@ export default function CatalogProductCard({ product, onAddToCart, country = 'CO
 
       {/* Add to Cart */}
       <button
-        onClick={() => onAddToCart?.(product)}
-        disabled={!inStock}
-        className={`mt-3 w-full text-sm font-bold py-3 px-5 rounded-pill transition-all duration-200 active:scale-95 ${
-          inStock
-            ? 'bg-sc-forest text-sc-cream hover:bg-sc-green'
+        onClick={handleAddToCart}
+        disabled={!inStock || addingToCart}
+        className={`mt-3 w-full text-sm font-bold py-3 px-5 rounded-pill transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 min-h-[44px] ${
+          addedToCart
+            ? 'bg-green-600 text-white cursor-default'
+            : inStock
+            ? 'bg-sc-forest text-sc-cream hover:bg-sc-green disabled:opacity-70'
             : 'bg-sc-beige text-sc-muted cursor-not-allowed'
         }`}
         aria-label={inStock ? `Agregar ${product.name} al carrito` : `${product.name} agotado`}
       >
-        {inStock ? 'Agregar al carrito' : 'Agotado'}
+        {addingToCart ? (
+          <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70"/>
+          </svg>
+        ) : addedToCart ? (
+          <>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M2 7l3.5 3.5 6.5-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            ¡Agregado!
+          </>
+        ) : inStock ? 'Agregar al carrito' : 'Agotado'}
       </button>
     </article>
   );

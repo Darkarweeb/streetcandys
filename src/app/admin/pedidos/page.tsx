@@ -10,6 +10,8 @@ import {
   ESTADO_COLORS,
   ALL_STATUSES,
 } from '@/lib/order-status';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/UXHelpers';
 
 // ─── Types ───────────────────────────────────────────────────
 interface OrderItem {
@@ -205,6 +207,8 @@ function OrderDrawer({ orden, onClose, onRefresh }: {
   const [refundProcessing, setRefundProcessing] = useState(false);
   const [refundError, setRefundError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'detalles' | 'timeline' | 'notas'>('detalles');
+  const { success: toastSuccess } = useToast();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   useEffect(() => {
     async function loadDetail() {
@@ -244,16 +248,24 @@ function OrderDrawer({ orden, onClose, onRefresh }: {
   };
 
   const handleCancel = async () => {
-    if (!confirm('¿Cancelar este pedido?')) return;
+    const confirmed = await confirm({
+      title: '¿Cancelar este pedido?',
+      message: `El pedido #${orden.order_number} será cancelado. Esta acción no se puede deshacer.`,
+      confirmLabel: 'Cancelar pedido',
+      cancelLabel: 'Volver',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     setSaving(true); setSaveError(null);
     try {
-      const res = await fetch(`/api/ordenes/${o.id}/estado`, {
+      const res = await fetch(`/api/ordenes/${(fullOrder || orden).id}/estado`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ estado: 'cancelled', nota: 'Cancelado por administrador' }),
       });
       const data = await res.json();
       if (!data.exito) throw new Error(data.error);
+      toastSuccess('Pedido cancelado');
       onRefresh();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Error');
@@ -310,6 +322,7 @@ function OrderDrawer({ orden, onClose, onRefresh }: {
 
   return (
     <>
+      {confirmDialog}
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
       <div className="fixed right-0 top-0 h-full w-full max-w-2xl bg-white z-50 shadow-2xl flex flex-col">
         {/* Header */}

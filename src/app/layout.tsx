@@ -8,6 +8,7 @@ import GoogleAnalytics from '@/components/GoogleAnalytics';
 import CapacitorProvider from '@/components/mobile/CapacitorProvider';
 import OfflineBanner from '@/components/mobile/OfflineBanner';
 import ChunkErrorHandler from '@/components/ChunkErrorHandler';
+import { ToastProvider } from '@/components/ui/Toast';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -142,10 +143,12 @@ export default function RootLayout({
           <Suspense fallback={null}>
             <GoogleAnalytics />
           </Suspense>
-          <CapacitorProvider>
-            <OfflineBanner />
-            {children}
-          </CapacitorProvider>
+          <ToastProvider>
+            <CapacitorProvider>
+              <OfflineBanner />
+              {children}
+            </CapacitorProvider>
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

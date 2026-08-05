@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import CuentaLayout from '@/components/cuenta/CuentaLayout';
 import { createClient } from '@/lib/supabase/client';
 import type { DbDireccion } from '@/lib/payment/types';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/UXHelpers';
 
 // ─── Country & Region Data ────────────────────────────────────────────────────
 
@@ -143,6 +145,8 @@ function AddressSkeleton() {
 export default function DireccionesPage() {
   const { user, profile } = useAuth();
   const supabase = useRef(createClient()).current;
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [addresses, setAddresses] = useState<DbDireccion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -273,22 +277,33 @@ export default function DireccionesPage() {
       await loadAddresses();
       setShowForm(false);
       setEditingId(null);
+      toastSuccess(editingId ? '✓ Dirección actualizada' : '✓ Dirección guardada');
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Error guardando dirección');
+      const msg = err instanceof Error ? err.message : 'Error guardando dirección';
+      setFormError(msg);
+      toastError(msg);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar esta dirección?')) return;
+    const confirmed = await confirm({
+      title: '¿Eliminar dirección?',
+      message: 'Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     setDeletingId(id);
     try {
       const { error: delError } = await supabase.from('addresses').delete().eq('id', id);
       if (delError) throw new Error(delError.message);
       await loadAddresses();
+      toastSuccess('Dirección eliminada');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error eliminando dirección');
+      toastError(err instanceof Error ? err.message : 'Error eliminando dirección');
     } finally {
       setDeletingId(null);
     }
@@ -301,8 +316,9 @@ export default function DireccionesPage() {
       await supabase.from('addresses').update({ is_default: false }).eq('profile_id', user.id);
       await supabase.from('addresses').update({ is_default: true, updated_at: new Date().toISOString() }).eq('id', id);
       await loadAddresses();
+      toastSuccess('✓ Dirección predeterminada actualizada');
     } catch {
-      alert('Error actualizando dirección predeterminada');
+      toastError('Error actualizando dirección predeterminada');
     } finally {
       setSettingDefaultId(null);
     }
@@ -314,6 +330,7 @@ export default function DireccionesPage() {
 
   return (
     <CuentaLayout>
+      {confirmDialog}
       <div className="animate-fade-in">
         <div className="flex items-center justify-between mb-6">
           <div>

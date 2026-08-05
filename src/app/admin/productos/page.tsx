@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import AdminLayout from '@/components/admin/AdminLayout';
 import type { ProductSummary, DbCategory } from '@/lib/products/types';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/UXHelpers';
 
 // ─── Skeleton ────────────────────────────────────────────────
 function RowSkeleton() {
@@ -83,6 +85,8 @@ function LowStockBanner({ items }: { items: LowStockItem[] }) {
 export default function AdminProductosPage() {
   const { profile, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [productos, setProductos] = useState<ProductSummary[]>([]);
   const [categorias, setCategorias] = useState<DbCategory[]>([]);
@@ -237,13 +241,23 @@ export default function AdminProductosPage() {
         setProductos((prev) =>
           prev.map((item) => item.id === p.id ? { ...item, is_active: !p.is_active } : item)
         );
+        toastSuccess(p.is_active ? `"${p.name}" despublicado` : `"${p.name}" publicado`);
+      } else {
+        toastError(data.error || 'Error actualizando producto');
       }
-    } catch { /* silent */ }
+    } catch { toastError('Error de conexión'); }
     setTogglingId(null);
   };
 
   const handleEliminar = async (p: ProductSummary) => {
-    if (!confirm(`¿Desactivar "${p.name}"? El producto dejará de aparecer en la tienda.`)) return;
+    const confirmed = await confirm({
+      title: `¿Desactivar "${p.name}"?`,
+      message: 'El producto dejará de aparecer en la tienda. Puedes volver a publicarlo en cualquier momento.',
+      confirmLabel: 'Desactivar',
+      cancelLabel: 'Cancelar',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
     setDeletingId(p.id);
     try {
       const res = await fetch(`/api/productos/${p.slug}`, { method: 'DELETE' });
@@ -251,27 +265,43 @@ export default function AdminProductosPage() {
       if (data.exito) {
         setProductos((prev) => prev.filter((item) => item.id !== p.id));
         setTotal((t) => t - 1);
+        toastSuccess(`"${p.name}" desactivado`);
       } else {
-        alert(data.error || 'Error eliminando producto');
+        toastError(data.error || 'Error eliminando producto');
       }
     } catch {
-      alert('Error de conexión');
+      toastError('Error de conexión');
     }
     setDeletingId(null);
   };
 
   const handleBulkDesactivar = async () => {
-    if (!confirm(`¿Desactivar ${seleccionados.size} productos?`)) return;
+    const confirmed = await confirm({
+      title: `¿Desactivar ${seleccionados.size} productos?`,
+      message: 'Los productos seleccionados dejarán de aparecer en la tienda.',
+      confirmLabel: 'Desactivar',
+      cancelLabel: 'Cancelar',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
     const slugs = productos.filter((p) => seleccionados.has(p.id)).map((p) => p.slug);
     for (const slug of slugs) {
       await fetch(`/api/productos/${slug}`, { method: 'DELETE' });
     }
     setSeleccionados(new Set());
     fetchProductos();
+    toastSuccess(`${slugs.length} productos desactivados`);
   };
 
   const handleBulkActivar = async () => {
-    if (!confirm(`¿Activar ${seleccionados.size} productos?`)) return;
+    const confirmed = await confirm({
+      title: `¿Publicar ${seleccionados.size} productos?`,
+      message: 'Los productos seleccionados serán visibles en la tienda.',
+      confirmLabel: 'Publicar',
+      cancelLabel: 'Cancelar',
+      variant: 'default',
+    });
+    if (!confirmed) return;
     const slugs = productos.filter((p) => seleccionados.has(p.id)).map((p) => p.slug);
     for (const slug of slugs) {
       await fetch(`/api/productos/${slug}`, {
@@ -282,6 +312,7 @@ export default function AdminProductosPage() {
     }
     setSeleccionados(new Set());
     fetchProductos();
+    toastSuccess(`${slugs.length} productos publicados`);
   };
 
   if (authLoading || (!profile && !authLoading)) return null;
@@ -289,6 +320,7 @@ export default function AdminProductosPage() {
 
   return (
     <AdminLayout title="Productos" subtitle={`${total} productos en catálogo`}>
+      {confirmDialog}
       <div className="space-y-4">
         {/* Low stock alerts */}
         <LowStockBanner items={lowStockItems} />

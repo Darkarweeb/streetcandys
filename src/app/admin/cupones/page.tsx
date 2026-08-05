@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/UXHelpers';
 
 // ─── Types ───────────────────────────────────────────────────
 interface Cupon {
@@ -197,6 +199,8 @@ export default function AdminCuponesPage() {
   const { profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const supabase = createClient();
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [cupones, setCupones] = useState<Cupon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -209,7 +213,6 @@ export default function AdminCuponesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState<Cupon | null>(null);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
   const POR_PAGINA = 15;
 
   useEffect(() => {
@@ -238,8 +241,6 @@ export default function AdminCuponesPage() {
     if (profile && ['admin', 'staff'].includes(profile.role)) fetchCupones();
   }, [profile, fetchCupones]);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
-
   const handleSave = async (form: CuponForm) => {
     setSaving(true);
     try {
@@ -260,39 +261,54 @@ export default function AdminCuponesPage() {
       if (editando) {
         const { error: err } = await supabase.from('coupons').update(payload).eq('id', editando.id);
         if (err) throw err;
-        showToast('Cupón actualizado');
+        toastSuccess('✓ Cupón actualizado');
       } else {
         const { error: err } = await supabase.from('coupons').insert(payload);
         if (err) throw err;
-        showToast('Cupón creado');
+        toastSuccess('✓ Cupón creado');
       }
       setModalOpen(false); setEditando(null);
       fetchCupones();
     } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : 'Error al guardar');
+      toastError(e instanceof Error ? e.message : 'Error al guardar');
     } finally { setSaving(false); }
   };
 
   const handleEliminar = async (id: string) => {
-    if (!confirm('¿Eliminar este cupón?')) return;
+    const confirmed = await confirm({
+      title: '¿Eliminar este cupón?',
+      message: 'Esta acción no se puede deshacer. Los usos existentes no se verán afectados.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const { error: err } = await supabase.from('coupons').delete().eq('id', id);
       if (err) throw err;
-      showToast('Cupón eliminado');
+      toastSuccess('Cupón eliminado');
       fetchCupones();
     } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : 'Error al eliminar');
+      toastError(e instanceof Error ? e.message : 'Error al eliminar');
     }
   };
 
   const handleBulkDesactivar = async () => {
     if (!seleccionados.length) return;
+    const confirmed = await confirm({
+      title: `¿Desactivar ${seleccionados.length} cupón(es)?`,
+      message: 'Los cupones seleccionados dejarán de ser válidos.',
+      confirmLabel: 'Desactivar',
+      cancelLabel: 'Cancelar',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
     setSaving(true);
     try {
       await supabase.from('coupons').update({ is_active: false }).in('id', seleccionados);
-      showToast(`${seleccionados.length} cupón(es) desactivado(s)`);
+      toastSuccess(`${seleccionados.length} cupón(es) desactivado(s)`);
       setSeleccionados([]); fetchCupones();
-    } catch { showToast('Error en acción masiva'); }
+    } catch { toastError('Error en acción masiva'); }
     finally { setSaving(false); }
   };
 
@@ -319,7 +335,9 @@ export default function AdminCuponesPage() {
 
   return (
     <AdminLayout title="Cupones" subtitle="Gestión de cupones de descuento y uso">
-      {toast && <div className="fixed top-4 right-4 z-50 bg-sc-forest text-white px-4 py-3 rounded-xl shadow-lg text-sm animate-slide-up">{toast}</div>}
+      {confirmDialog}
+      {toastError && <div className="fixed top-4 right-4 z-50 bg-red-600 text-white px-4 py-3 rounded-xl shadow-lg text-sm animate-slide-up">{toastError}</div>}
+      {toastSuccess && <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-xl shadow-lg text-sm animate-slide-up">{toastSuccess}</div>}
 
       <ModalCupon
         open={modalOpen}

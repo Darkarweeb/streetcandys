@@ -39,10 +39,27 @@
     font-size: 16px;
   }
 
+  /* Visible focus indicators for keyboard navigation */
   *:focus-visible {
     outline: 2px solid #4571CB;
     outline-offset: 2px;
     border-radius: 4px;
+  }
+
+  /* Minimum touch target size for interactive elements */
+  button,
+  [role="button"],
+  a,
+  input[type="checkbox"],
+  input[type="radio"],
+  select {
+    min-height: 44px;
+  }
+
+  /* Exception: inline/icon-only elements that are explicitly sized */
+  button.no-min-height,
+  a.no-min-height {
+    min-height: unset;
   }
 }
 
@@ -57,5 +74,10 @@
 
   .tracking-tightest {
     letter-spacing: -0.04em;
+  }
+
+  /* Smooth number transitions for animated totals */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }

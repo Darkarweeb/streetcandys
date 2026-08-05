@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import CuentaLayout from '@/components/cuenta/CuentaLayout';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/UXHelpers';
 
 interface WishlistItem {
   id: string;
@@ -43,6 +45,8 @@ function WishlistSkeleton() {
 export default function FavoritosPage() {
   const { user } = useAuth();
   const supabase = useRef(createClient()).current;
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +82,14 @@ export default function FavoritosPage() {
   useEffect(() => { loadWishlist(); }, [loadWishlist]);
 
   const handleRemove = async (wishlistId: string, productId: string) => {
+    const confirmed = await confirm({
+      title: '¿Quitar de favoritos?',
+      message: 'El producto se eliminará de tu lista de favoritos.',
+      confirmLabel: 'Quitar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     setRemovingId(wishlistId);
     try {
       const { error: delError } = await supabase
@@ -87,8 +99,9 @@ export default function FavoritosPage() {
         .eq('profile_id', user!.id);
       if (delError) throw new Error(delError.message);
       setItems(prev => prev.filter(i => i.id !== wishlistId));
+      toastSuccess('Producto eliminado de favoritos');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error eliminando favorito');
+      toastError(err instanceof Error ? err.message : 'Error eliminando favorito');
     } finally {
       setRemovingId(null);
     }
@@ -109,9 +122,10 @@ export default function FavoritosPage() {
         throw new Error(data.error || 'Error al agregar al carrito');
       }
       setCartFeedback(item.product_id);
+      toastSuccess(`✓ ${item.product?.name || 'Producto'} agregado al carrito`);
       setTimeout(() => setCartFeedback(null), 2000);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al agregar al carrito');
+      toastError(err instanceof Error ? err.message : 'Error al agregar al carrito');
     } finally {
       setAddingToCart(null);
     }
@@ -119,6 +133,7 @@ export default function FavoritosPage() {
 
   return (
     <CuentaLayout>
+      {confirmDialog}
       <div className="animate-fade-in">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-sc-forest tracking-tight">Mis Favoritos</h1>
