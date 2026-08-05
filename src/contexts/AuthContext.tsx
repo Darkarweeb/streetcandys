@@ -146,70 +146,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [fetchProfile]);
 
   const signUp = async ({ email, password, fullName, countryCode }: SignUpData) => {
-    console.log("[SIGNUP FUNCTION ENTERED]", email);
     if (!ALLOWED_COUNTRIES.includes(countryCode)) {
       throw new Error('Street Candy solo está disponible en Colombia y Costa Rica.');
     }
 
-    console.log('[signUp] BEFORE calling supabase.auth.signUp — email:', email);
-    console.log('[signUp] Calling supabase.auth.signUp()');
+    // User creation is handled server-side via the Admin API so that Supabase
+    // never attempts its own email delivery (which caused HTTP 500
+    // "Error sending confirmation email"). The server route:
+    //   1. Creates the user with email_confirm: false
+    //   2. Generates a confirmation link via generateLink
+    //   3. Sends the welcome + confirmation email via Resend
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, fullName, countryCode }),
+    });
 
-    let rawResponse: Awaited<ReturnType<typeof supabase.auth.signUp>>;
-    try {
-      rawResponse = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            country_code: countryCode,
-            role: 'customer',
-          },
-          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback`,
-        },
-      });
-    } catch (networkErr: unknown) {
-      console.error('[signUp] NETWORK/THROW ERROR from supabase.auth.signUp():');
-      console.error('  typeof error         :', typeof networkErr);
-      console.error('  String(error)        :', String(networkErr));
-      console.error('  error?.message       :', (networkErr as any)?.message);
-      console.error('  JSON.stringify(error):', JSON.stringify(networkErr, Object.getOwnPropertyNames(networkErr as object)));
-      console.error('  full error obj       :', networkErr);
-      throw new Error((networkErr as any)?.message || 'Error de red al crear la cuenta.');
-    }
-
-    const { data, error } = rawResponse;
-
-    console.log('[signUp] AFTER supabase.auth.signUp() resolved');
-    console.log('[signUp] RAW RESPONSE:', JSON.stringify(rawResponse, null, 2));
-    console.log('[signUp] RAW RESPONSE (unserialised):', rawResponse);
-    console.log('[signUp] RAW data:', data);
-    console.log('[signUp] RAW error:', error);
-
-    if (error) {
-      console.log('RAW ERROR', error);
-      console.error('[signUp] ERROR DETAILS:');
-      console.error('  typeof error         :', typeof error);
-      console.error('  String(error)        :', String(error));
-      console.error('  error?.message       :', error?.message);
-      console.error('  JSON.stringify(error):', JSON.stringify(error, Object.getOwnPropertyNames(error)));
-      console.error('  error.code           :', (error as any).code);
-      console.error('  error.details        :', (error as any).details);
-      console.error('  error.hint           :', (error as any).hint);
-      console.error('  error.status         :', (error as any).status);
-      console.error('  error.name           :', error.name);
-      console.error('  full error obj       :', error);
-      throw new Error(error.message || 'Error al crear la cuenta.');
-    }
-
-    console.log('[signUp] SUCCESS — user:', data.user?.id, '| email:', data.user?.email);
-
-    // Profile is created automatically by the handle_new_user() SECURITY DEFINER trigger
-    // on auth.users INSERT. No manual upsert needed — and it would fail anyway because
-    // at this point there is no active session (email confirmation pending), so
-    // auth.uid() returns NULL and the profiles_insert_own RLS policy blocks the insert.
-    if (!data.user) {
-      console.warn('[signUp] signUp returned no user object — email may already be registered');
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error || 'Error al crear la cuenta.');
     }
   };
 
