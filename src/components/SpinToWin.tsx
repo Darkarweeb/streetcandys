@@ -1,6 +1,5 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { useSpinToWinSettings, DEFAULT_SPIN_SETTINGS, SpinPrize } from '@/hooks/useSpinToWinSettings';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -111,7 +110,8 @@ export default function SpinToWin() {
 
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
-  const [phase, setPhase] = useState<'form' | 'spinning' | 'result' | 'pending_verification'>('form');
+  // Added 'otp_verify' phase between 'form' and 'spinning'
+  const [phase, setPhase] = useState<'form' | 'otp_verify' | 'spinning' | 'result'>('form');
 
   // Form state
   const [email, setEmail] = useState('');
@@ -121,6 +121,14 @@ export default function SpinToWin() {
   const [consentError, setConsentError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // OTP state
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpMessage, setOtpMessage] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
   // Wheel state
   const [rotation, setRotation] = useState(0);
   const [winIndex, setWinIndex] = useState<number | null>(null);
@@ -128,12 +136,18 @@ export default function SpinToWin() {
   const [copied, setCopied] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  // Verification state
-  const [pendingEmail, setPendingEmail] = useState('');
-  const [pendingPrize, setPendingPrize] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [resendLoading, setResendLoading] = useState(false);
-  const [resendMessage, setResendMessage] = useState('');
+  // Stored form data to use after OTP verification
+  const pendingFormRef = useRef<{
+    email: string;
+    nombre: string;
+    consent: boolean;
+    prizeLabel: string;
+    prizeValue: number | null;
+    discountType: 'percentage' | 'shipping';
+    couponExpirationDays: number;
+    minimumPurchase: number;
+    idx: number;
+  } | null>(null);
 
   const spinAnimRef = useRef<number | null>(null);
   const startRotRef = useRef(0);
@@ -181,7 +195,7 @@ export default function SpinToWin() {
     };
   }, [mounted, settingsLoading, settings.enabled, settings.delay_seconds, settings.exit_intent]);
 
-  // ── Resend cooldown timer ────────────────────────────────────────────────────
+  // ── Resend OTP cooldown timer ────────────────────────────────────────────────
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const timer = setTimeout(() => setResendCooldown(c => c - 1), 1000);
@@ -230,80 +244,153 @@ export default function SpinToWin() {
       spinAnimRef.current = requestAnimationFrame(animateSpin);
     } else {
       setRotation(targetRotRef.current);
-      // ✅ FIX: Clear the ref so waitForAnimation can detect completion
       spinAnimRef.current = null;
-      // Phase is set after API response is received
     }
   }, []);
 
-  // ── Submit form & spin ───────────────────────────────────────────────────────
-  const handleSpin = async (e: React.FormEvent) => {
+  // ── Step 1: Submit form → send OTP ───────────────────────────────────────────
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     setSubmitting(true);
-    setSaveError('');
+    setOtpMessage('');
 
     const prizes = settings.prizes ?? DEFAULT_SPIN_SETTINGS.prizes;
     const idx = pickWeightedIndex(prizes);
-    setWinIndex(idx);
-
-    const SEG_ANGLE = 360 / prizes.length;
-    const segCenterAngle = idx * SEG_ANGLE + SEG_ANGLE / 2;
-    const extraSpins = 5 * 360;
-    const alignAngle = (360 - segCenterAngle) % 360;
-    const target = startRotRef.current + extraSpins + alignAngle;
-
-    targetRotRef.current = target;
-    startTimeRef.current = 0;
-    startRotRef.current = rotation;
-
-    setPhase('spinning');
-
-    // Start animation immediately
-    spinAnimRef.current = requestAnimationFrame(animateSpin);
-
     const seg = prizes[idx];
     const expirationDays = settings.coupon_expiration_days ?? DEFAULT_SPIN_SETTINGS.coupon_expiration_days;
     const minPurchase = settings.minimum_purchase ?? DEFAULT_SPIN_SETTINGS.minimum_purchase;
 
-    // ── Call server-side API (handles verification + DB + coupon) ─────────────
+    // Store form data for use after OTP verification
+    pendingFormRef.current = {
+      email: email.trim().toLowerCase(),
+      nombre: nombre.trim(),
+      consent,
+      prizeLabel: seg.label,
+      prizeValue: seg.value,
+      discountType: seg.discountType,
+      couponExpirationDays: expirationDays,
+      minimumPurchase: minPurchase,
+      idx,
+    };
+
     try {
-      // ✅ FIX: Add AbortController for network timeout (10s)
+      const res = await fetch('/api/spin/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.error === 'already_spun') {
+          setSaveError('Este correo ya participó en la ruleta. Solo se permite un giro por correo.');
+          if (data.existingCoupon) setCouponCode(data.existingCoupon);
+          setWinIndex(idx);
+          setPhase('result');
+        } else {
+          setEmailError(data.error || 'No se pudo enviar el código. Intenta de nuevo.');
+        }
+        return;
+      }
+
+      // OTP sent — move to verification phase
+      setOtpCode('');
+      setOtpError('');
+      setOtpMessage('');
+      setResendCooldown(60);
+      setPhase('otp_verify');
+    } catch {
+      setEmailError('Error de conexión. Por favor intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Step 2: Verify OTP → spin wheel ──────────────────────────────────────────
+  const handleOTPVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode.trim() || otpCode.trim().length !== 6) {
+      setOtpError('Ingresa el código de 6 dígitos');
+      return;
+    }
+
+    const pending = pendingFormRef.current;
+    if (!pending) {
+      setOtpError('Sesión expirada. Por favor recarga la página.');
+      return;
+    }
+
+    setOtpLoading(true);
+    setOtpError('');
+
+    try {
+      // Verify OTP
+      const verifyRes = await fetch('/api/spin/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pending.email, code: otpCode.trim() }),
+      });
+
+      const verifyData = await verifyRes.json();
+
+      if (!verifyRes.ok) {
+        setOtpError(verifyData.message || 'Código incorrecto. Intenta de nuevo.');
+        return;
+      }
+
+      // OTP verified — start spin animation
+      setWinIndex(pending.idx);
+
+      const prizes = settings.prizes ?? DEFAULT_SPIN_SETTINGS.prizes;
+      const SEG_ANGLE = 360 / prizes.length;
+      const segCenterAngle = pending.idx * SEG_ANGLE + SEG_ANGLE / 2;
+      const extraSpins = 5 * 360;
+      const alignAngle = (360 - segCenterAngle) % 360;
+      const target = startRotRef.current + extraSpins + alignAngle;
+
+      targetRotRef.current = target;
+      startTimeRef.current = 0;
+      startRotRef.current = rotation;
+
+      setPhase('spinning');
+      spinAnimRef.current = requestAnimationFrame(animateSpin);
+
+      // Call girar API (now trusts OTP was verified)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      let res: Response;
+      let spinRes: Response;
       try {
-        res = await fetch('/api/spin/girar', {
+        spinRes = await fetch('/api/spin/girar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
           body: JSON.stringify({
-            email: email.trim().toLowerCase(),
-            nombre: nombre.trim() || undefined,
-            consent,
-            prizeLabel: seg.label,
-            prizeValue: seg.value,
-            discountType: seg.discountType,
-            couponExpirationDays: expirationDays,
-            minimumPurchase: minPurchase,
+            email: pending.email,
+            nombre: pending.nombre || undefined,
+            consent: pending.consent,
+            prizeLabel: pending.prizeLabel,
+            prizeValue: pending.prizeValue,
+            discountType: pending.discountType,
+            couponExpirationDays: pending.couponExpirationDays,
+            minimumPurchase: pending.minimumPurchase,
           }),
         });
       } finally {
         clearTimeout(timeoutId);
       }
 
-      const data = await res.json();
+      const spinData = await spinRes.json();
 
-      // ✅ FIX: Wait for animation to finish before showing result
-      // Hard timeout of SPIN_DURATION + 500ms ensures we never hang forever
+      // Wait for animation to finish
       const waitForAnimation = () =>
         new Promise<void>((resolve) => {
           const deadline = Date.now() + SPIN_DURATION + 500;
           const check = () => {
             if (spinAnimRef.current === null || Date.now() >= deadline) {
-              // Ensure ref is cleared
               if (spinAnimRef.current !== null) {
                 cancelAnimationFrame(spinAnimRef.current);
                 spinAnimRef.current = null;
@@ -313,51 +400,30 @@ export default function SpinToWin() {
               setTimeout(check, 50);
             }
           };
-          // Start checking after the minimum spin duration
           setTimeout(check, SPIN_DURATION);
         });
 
       await waitForAnimation();
 
-      if (!res.ok) {
-        if (data.error === 'already_spun') {
-          // Mark as completed in localStorage so it doesn't show again
-          try {
-            localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true }));
-          } catch {}
+      if (!spinRes.ok) {
+        if (spinData.error === 'already_spun') {
+          try { localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true })); } catch {}
           setSaveError('Este correo ya participó en la ruleta. Solo se permite un giro por correo.');
-          setPhase('result');
-          if (data.existingCoupon) {
-            setCouponCode(data.existingCoupon);
-          }
+          if (spinData.existingCoupon) setCouponCode(spinData.existingCoupon);
         } else {
-          setSaveError(data.error || 'Error al procesar el giro. Intenta de nuevo.');
-          setPhase('result');
+          setSaveError(spinData.error || 'Error al procesar el giro. Intenta de nuevo.');
         }
-      } else if (data.status === 'pending_verification') {
-        // ✅ Email not confirmed — show verification pending screen
-        setPendingEmail(data.email);
-        setPendingPrize(data.prize);
-        setPhase('pending_verification');
-        try {
-          localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true }));
-        } catch {}
-      } else if (data.status === 'success') {
-        setCouponCode(data.couponCode);
         setPhase('result');
-        try {
-          localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true }));
-        } catch {}
+      } else if (spinData.status === 'success') {
+        setCouponCode(spinData.couponCode);
+        setPhase('result');
+        try { localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true })); } catch {}
       } else {
-        // coupon_error or other partial success
-        setSaveError(data.message || 'Tu premio fue registrado, pero hubo un error al generar el cupón.');
+        setSaveError(spinData.message || 'Tu premio fue registrado, pero hubo un error al generar el cupón.');
         setPhase('result');
-        try {
-          localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true }));
-        } catch {}
+        try { localStorage.setItem(LS_KEY, JSON.stringify({ dismissed: false, completed: true })); } catch {}
       }
     } catch (err: unknown) {
-      // ✅ FIX: Ensure animation is stopped on any error
       if (spinAnimRef.current !== null) {
         cancelAnimationFrame(spinAnimRef.current);
         spinAnimRef.current = null;
@@ -370,32 +436,45 @@ export default function SpinToWin() {
       );
       setPhase('result');
     } finally {
-      // ✅ FIX: Always clear submitting state
-      setSubmitting(false);
+      setOtpLoading(false);
     }
   };
 
-  // ── Resend confirmation email ────────────────────────────────────────────────
-  const handleResendConfirmation = async () => {
-    if (resendCooldown > 0 || resendLoading) return;
-    setResendLoading(true);
-    setResendMessage('');
+  // ── Resend OTP ───────────────────────────────────────────────────────────────
+  const handleResendOTP = async () => {
+    if (resendCooldown > 0 || otpSending) return;
+    const pending = pendingFormRef.current;
+    if (!pending) return;
+
+    setOtpSending(true);
+    setOtpMessage('');
+    setOtpError('');
+
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: pendingEmail,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
+      const res = await fetch('/api/spin/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pending.email }),
       });
-      if (error) throw error;
-      setResendMessage('✅ Correo de confirmación reenviado. Revisa tu bandeja de entrada.');
-      setResendCooldown(60);
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.error === 'rate_limited') {
+          setResendCooldown(data.waitSeconds ?? 60);
+          setOtpMessage(`Espera ${data.waitSeconds ?? 60} segundos antes de solicitar otro código.`);
+        } else {
+          setOtpMessage(data.error || 'No se pudo reenviar el código.');
+        }
+      } else {
+        setOtpMessage('✅ Nuevo código enviado. Revisa tu bandeja de entrada.');
+        setResendCooldown(60);
+        setOtpCode('');
+      }
     } catch {
-      setResendMessage('No se pudo reenviar el correo. Intenta de nuevo.');
+      setOtpMessage('Error de conexión. Intenta de nuevo.');
     } finally {
-      setResendLoading(false);
+      setOtpSending(false);
     }
   };
 
@@ -424,9 +503,7 @@ export default function SpinToWin() {
       aria-modal="true"
       aria-label="Ruleta de premios"
     >
-      {/* Close button — outside modal card so overflow-hidden never clips it */}
-      {/* ✅ FIX: Always show close button (removed phase !== 'spinning' guard)
-          During spinning we show a dimmed version so the modal is never uncloseable */}
+      {/* Close button */}
       <button
         onClick={dismiss}
         disabled={phase === 'spinning'}
@@ -457,8 +534,8 @@ export default function SpinToWin() {
           </p>
         </div>
 
-        {/* Wheel — hidden on pending_verification phase */}
-        {phase !== 'pending_verification' && (
+        {/* Wheel — only shown during spinning and result phases */}
+        {(phase === 'spinning' || phase === 'result') && (
           <div className="flex justify-center items-center py-4 bg-sc-forest relative">
             <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10" aria-hidden="true">
               <svg width="24" height="28" viewBox="0 0 24 28" fill="none">
@@ -472,7 +549,7 @@ export default function SpinToWin() {
         <div className="px-6 pb-6">
           {/* ── FORM PHASE ── */}
           {phase === 'form' && (
-            <form onSubmit={handleSpin} noValidate className="space-y-4 pt-4">
+            <form onSubmit={handleFormSubmit} noValidate className="space-y-4 pt-4">
               <div>
                 <label htmlFor="spin-email" className="block text-sm font-semibold text-sc-forest mb-1">
                   Correo electrónico <span className="text-red-500">*</span>
@@ -535,7 +612,7 @@ export default function SpinToWin() {
                     <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70" />
                     </svg>
-                    Preparando...
+                    Enviando código...
                   </>
                 ) : (
                   '🎰 ¡Girar la ruleta!'
@@ -548,72 +625,110 @@ export default function SpinToWin() {
             </form>
           )}
 
+          {/* ── OTP VERIFY PHASE ── */}
+          {phase === 'otp_verify' && (
+            <div className="pt-5 pb-2 space-y-5">
+              {/* Icon + heading */}
+              <div className="text-center space-y-2">
+                <div className="flex justify-center">
+                  <div className="w-16 h-16 rounded-full bg-sc-forest/10 flex items-center justify-center">
+                    <span className="text-3xl">📧</span>
+                  </div>
+                </div>
+                <p className="text-sc-forest font-black text-lg leading-tight">Verifica tu correo</p>
+                <p className="text-sc-muted text-sm leading-relaxed">
+                  Enviamos un código de 6 dígitos a{' '}
+                  <strong className="text-sc-forest break-all">{pendingFormRef.current?.email}</strong>
+                </p>
+              </div>
+
+              {/* OTP input form */}
+              <form onSubmit={handleOTPVerify} noValidate className="space-y-4">
+                <div>
+                  <label htmlFor="otp-code" className="block text-sm font-semibold text-sc-forest mb-1">
+                    Código de verificación <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="otp-code"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      setOtpCode(val);
+                      setOtpError('');
+                    }}
+                    placeholder="000000"
+                    className={`w-full border rounded-lg px-3 py-3 text-center text-2xl font-mono font-black tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-sc-forest/30 bg-white ${
+                      otpError ? 'border-red-400' : 'border-sc-border'
+                    }`}
+                    autoComplete="one-time-code"
+                    autoFocus
+                  />
+                  {otpError && <p className="text-red-500 text-xs mt-1 text-center">{otpError}</p>}
+                </div>
+
+                {otpMessage && (
+                  <p className={`text-xs px-3 py-2 rounded-lg text-center ${otpMessage.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                    {otpMessage}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={otpLoading || otpCode.length !== 6}
+                  className="w-full bg-sc-forest text-sc-cream font-bold py-3.5 rounded-pill text-sm hover:bg-sc-green transition-colors active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {otpLoading ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70" />
+                      </svg>
+                      Verificando...
+                    </>
+                  ) : (
+                    '✅ Verificar y girar'
+                  )}
+                </button>
+              </form>
+
+              {/* Resend + back */}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleResendOTP}
+                  disabled={resendCooldown > 0 || otpSending}
+                  className="w-full border border-sc-border text-sc-forest font-semibold py-2.5 rounded-pill text-sm hover:bg-sc-beige transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {otpSending ? (
+                    <>
+                      <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70" />
+                      </svg>
+                      Enviando...
+                    </>
+                  ) : resendCooldown > 0 ? (
+                    `Reenviar código en ${resendCooldown}s`
+                  ) : (
+                    '📨 Reenviar código'
+                  )}
+                </button>
+                <button
+                  onClick={() => setPhase('form')}
+                  className="w-full text-sc-muted text-xs py-1.5 hover:text-sc-forest transition-colors"
+                >
+                  ← Cambiar correo
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ── SPINNING PHASE ── */}
           {phase === 'spinning' && (
             <div className="pt-4 text-center">
               <p className="text-sc-forest font-bold text-lg animate-pulse">¡Girando…!</p>
               <p className="text-sc-muted text-sm mt-1">Espera tu premio 🎉</p>
-            </div>
-          )}
-
-          {/* ── PENDING VERIFICATION PHASE ── */}
-          {phase === 'pending_verification' && (
-            <div className="pt-6 pb-2 text-center space-y-5">
-              {/* Gift icon */}
-              <div className="flex justify-center">
-                <div className="w-20 h-20 rounded-full bg-sc-forest/10 flex items-center justify-center">
-                  <span className="text-4xl">🎁</span>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sc-forest font-black text-xl leading-tight">
-                  ¡Ganaste {pendingPrize}!
-                </p>
-                <p className="text-sc-forest font-semibold text-base mt-2">
-                  Confirma tu correo del Crew para activar tu descuento 🎁
-                </p>
-              </div>
-
-              <div className="bg-sc-beige rounded-xl p-4 text-left space-y-2">
-                <p className="text-xs text-sc-muted font-semibold uppercase tracking-widest">Tu correo</p>
-                <p className="text-sc-forest font-bold text-sm break-all">{pendingEmail}</p>
-                <p className="text-xs text-sc-muted leading-relaxed">
-                  Enviamos un correo de confirmación a esta dirección. Una vez que confirmes tu cuenta, tu descuento quedará activado automáticamente.
-                </p>
-              </div>
-
-              {resendMessage && (
-                <p className={`text-xs px-3 py-2 rounded-lg ${resendMessage.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                  {resendMessage}
-                </p>
-              )}
-
-              <button
-                onClick={handleResendConfirmation}
-                disabled={resendCooldown > 0 || resendLoading}
-                className="w-full bg-sc-forest text-sc-cream font-bold py-3 rounded-pill text-sm hover:bg-sc-green transition-colors active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {resendLoading ? (
-                  <>
-                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70" />
-                    </svg>
-                    Enviando...
-                  </>
-                ) : resendCooldown > 0 ? (
-                  `Reenviar en ${resendCooldown}s`
-                ) : (
-                  '📧 Reenviar confirmación'
-                )}
-              </button>
-
-              <button
-                onClick={dismiss}
-                className="w-full border border-sc-border text-sc-forest font-semibold py-2.5 rounded-pill text-sm hover:bg-sc-beige transition-colors"
-              >
-                Cerrar
-              </button>
             </div>
           )}
 
