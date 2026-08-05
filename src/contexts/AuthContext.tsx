@@ -150,7 +150,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw new Error('Street Candy solo está disponible en Colombia y Costa Rica.');
     }
 
-    const { data, error } = await supabase.auth.signUp({
+    console.log('[signUp] Before signUp', { email, fullName, countryCode });
+    console.log('[signUp] Calling supabase.auth.signUp()');
+
+    const rawResponse = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -163,7 +166,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       },
     });
 
-    if (error) throw error;
+    const { data, error } = rawResponse;
+
+    console.log('[signUp] After signUp');
+    console.log('[signUp] RAW RESPONSE:', JSON.stringify(rawResponse, null, 2));
+
+    if (error) {
+      console.error('[signUp] ERROR DETAILS:');
+      console.error('  error.message :', error.message);
+      console.error('  error.code    :', (error as any).code);
+      console.error('  error.status  :', (error as any).status);
+      console.error('  error.name    :', error.name);
+      console.error('  full error obj:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      throw error;
+    }
 
     // If profile wasn't auto-created by trigger, create it manually
     if (data.user) {
