@@ -101,25 +101,15 @@ export default function RegistroPage() {
         console.warn('[registro] Welcome email request failed (non-fatal):', err);
       });
     } catch (err: unknown) {
-      console.log('RAW ERROR', err);
-      console.error('[registro] CATCH BLOCK — error details:');
-      console.error('  typeof error         :', typeof err);
-      console.error('  String(error)        :', String(err));
-      console.error('  error?.message       :', (err as any)?.message);
-      console.error('  JSON.stringify(error):', JSON.stringify(err, Object.getOwnPropertyNames(err as object)));
-      console.error('  full error obj       :', err);
-
-      const serialized = (() => {
-        try { return JSON.stringify(err, Object.getOwnPropertyNames(err as object), 2); } catch { return String(err); }
-      })();
+      console.log("REGISTRO CATCH RAW VALUE:", err);
+      console.log("REGISTRO CATCH TYPE:", typeof err);
+      console.log("REGISTRO CATCH KEYS:", Object.keys((err as any) || {}));
 
       const msg = err instanceof Error ? err.message : 'Error al crear la cuenta.';
       if (msg.includes('already registered') || msg.includes('already exists')) {
         setError('Este correo ya está registrado. ¿Quieres iniciar sesión?');
-      } else if (msg && msg !== '{}') {
-        setError(`${msg}\n\n[DEBUG] ${serialized}`);
       } else {
-        setError(`[DEBUG] Error serializado: ${serialized}`);
+        setError(msg || 'Error al crear la cuenta.');
       }
     } finally {
       setLoading(false);
