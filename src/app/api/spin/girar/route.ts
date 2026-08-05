@@ -103,9 +103,9 @@ export async function POST(req: NextRequest) {
 
     const { error: leadError } = await adminClient.from('spin_leads').insert({
       email: normalizedEmail,
-      name: nombre?.trim() || null,
-      consent,
-      prize: prizeLabel,
+      first_name: nombre?.trim() || null,
+      marketing_consent: consent,
+      prize_label: prizeLabel,
       coupon_code: emailConfirmed ? couponCode : null,
       user_id: userId,
       verification_status: verificationStatus,
@@ -138,8 +138,8 @@ export async function POST(req: NextRequest) {
     const couponPayload = {
       code: couponCode,
       description: `Ruleta de premios — ${prizeLabel} — ${normalizedEmail}`,
-      discount_type: discountType === 'shipping' ? 'shipping' : 'percentage',
-      discount_value: discountType === 'shipping' ? 0 : (prizeValue ?? 5),
+      discount_type: discountType === 'shipping' ? 'fixed' : 'percentage',
+      discount_value: discountType === 'shipping' ? 0.01 : (prizeValue ?? 5),
       minimum_order_amount: minimumPurchase,
       maximum_discount: null,
       usage_limit: 1,
