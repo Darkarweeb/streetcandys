@@ -19,6 +19,7 @@ interface AppImageProps {
     fallbackSrc?: string;
     loading?: 'lazy' | 'eager';
     unoptimized?: boolean;
+    showSkeleton?: boolean;
     [key: string]: any;
 }
 
@@ -38,6 +39,7 @@ const AppImage = memo(function AppImage({
     fallbackSrc = '/assets/images/no_image.png',
     loading = 'lazy',
     unoptimized = false,
+    showSkeleton = true,
     ...props
 }: AppImageProps) {
     const [imageSrc, setImageSrc] = useState(src);
@@ -62,7 +64,7 @@ const AppImage = memo(function AppImage({
 
     const imageClassName = useMemo(() => {
         const classes = [className];
-        if (isLoading) classes.push('bg-gray-200');
+        if (isLoading) classes.push('opacity-0');
         if (onClick) classes.push('cursor-pointer hover:opacity-90 transition-opacity duration-200');
         return classes.filter(Boolean).join(' ');
     }, [className, isLoading, onClick]);
@@ -71,7 +73,7 @@ const AppImage = memo(function AppImage({
         const baseProps: any = {
             src: imageSrc,
             alt,
-            className: imageClassName,
+            className: `${imageClassName} transition-opacity duration-300`,
             quality,
             placeholder,
             unoptimized: resolvedUnoptimized,
@@ -96,6 +98,16 @@ const AppImage = memo(function AppImage({
     if (fill) {
         return (
             <div className="relative" style={{ width: '100%', height: '100%' }}>
+                {/* Skeleton overlay while loading */}
+                {isLoading && showSkeleton && (
+                    <div className="absolute inset-0 bg-sc-beige animate-pulse z-10 flex items-center justify-center">
+                        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="text-sc-border opacity-50">
+                            <rect x="2" y="2" width="24" height="24" rx="3" stroke="currentColor" strokeWidth="1.5"/>
+                            <circle cx="9" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
+                            <path d="M2 19l7-5 5 4 3-2.5 9 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    </div>
+                )}
                 <Image
                     {...imageProps}
                     fill
@@ -108,13 +120,25 @@ const AppImage = memo(function AppImage({
     }
 
     return (
-        <Image
-            {...imageProps}
-            width={width || 400}
-            height={height || 300}
-            sizes={sizes}
-            {...props}
-        />
+        <div className="relative inline-block" style={{ width: width || 400, height: height || 300 }}>
+            {/* Skeleton overlay while loading */}
+            {isLoading && showSkeleton && (
+                <div className="absolute inset-0 bg-sc-beige animate-pulse z-10 rounded flex items-center justify-center">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="text-sc-border opacity-50">
+                        <rect x="2" y="2" width="24" height="24" rx="3" stroke="currentColor" strokeWidth="1.5"/>
+                        <circle cx="9" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M2 19l7-5 5 4 3-2.5 9 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                </div>
+            )}
+            <Image
+                {...imageProps}
+                width={width || 400}
+                height={height || 300}
+                sizes={sizes}
+                {...props}
+            />
+        </div>
     );
 });
 

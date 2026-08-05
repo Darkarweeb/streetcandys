@@ -44,6 +44,7 @@ module.exports = {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.6s ease-out',
         'marquee': 'marquee 30s linear infinite',
+        'pulse-once': 'pulseOnce 0.4s ease-in-out',
       },
       keyframes: {
         fadeIn: {
@@ -57,6 +58,10 @@ module.exports = {
         marquee: {
           '0%': { transform: 'translateX(0%)' },
           '100%': { transform: 'translateX(-50%)' },
+        },
+        pulseOnce: {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.05)' },
         },
       },
     },

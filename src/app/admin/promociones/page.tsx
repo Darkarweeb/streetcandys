@@ -8,6 +8,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/UXHelpers';
 import type { Promotion, PromotionFormData, PromotionType } from '@/lib/promotions/types';
 import {
   PROMOTION_TYPE_LABELS,
@@ -525,7 +527,8 @@ export default function AdminPromocionesPage() {
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
   const [analyticsPromotion, setAnalyticsPromotion] = useState<Promotion | null>(null);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const PER_PAGE = 15;
 
   useEffect(() => {
@@ -565,9 +568,9 @@ export default function AdminPromocionesPage() {
     if (profile && ['admin', 'staff'].includes(profile.role)) fetchPromotions();
   }, [profile, fetchPromotions]);
 
-  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+  const showToast = (msg: string, type?: string) => {
+    if (type === 'error') toastError(msg);
+    else toastSuccess(msg);
   };
 
   const formFromPromotion = (p: Promotion): PromotionFormData => ({
@@ -682,7 +685,14 @@ export default function AdminPromocionesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar esta promoción? Esta acción no se puede deshacer.')) return;
+    const confirmed = await confirm({
+      title: '¿Eliminar esta promoción?',
+      message: 'Esta acción no se puede deshacer. Los datos de uso se perderán.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const { error: err } = await supabase.from('promotions').delete().eq('id', id);
       if (err) throw err;
@@ -705,19 +715,7 @@ export default function AdminPromocionesPage() {
 
   return (
     <AdminLayout title="Promociones" subtitle="Gestión de descuentos y promociones">
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-slide-up ${
-          toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-sc-forest text-white'
-        }`}>
-          {toast.type === 'error'
-            ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M8 5v3M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-            : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          }
-          {toast.msg}
-        </div>
-      )}
-
+      {confirmDialog}
       {/* Analytics Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <AnalyticsCard

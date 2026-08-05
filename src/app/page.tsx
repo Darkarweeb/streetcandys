@@ -10,6 +10,7 @@ import AnnouncementBar from '@/components/AnnouncementBar';
 import type { ProductSummary, CategoryWithChildren } from '@/lib/products/types';
 import { formatPrice, formatPriceValue, isProductAvailableInCountry, type Country } from '@/lib/price';
 import { useCartPersistence } from '@/hooks/useCartPersistence';
+import { getBlogImageProps } from '@/lib/blog/blog-image-utils';
 
 const COUNTRY_KEY = 'sc_country';
 
@@ -37,11 +38,11 @@ interface CartItem {
 interface BlogPost {
   id: string;
   title: string;
-  excerpt: string;
-  image: string;
-  category: string;
-  readTime: string;
+  excerpt: string | null;
+  cover_image_url: string | null;
   slug: string;
+  read_time_minutes: number | null;
+  blog_categories?: { name: string; slug: string } | null;
 }
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -979,39 +980,19 @@ function EducationalSection() {
 
 // ─── BLOG PREVIEW ─────────────────────────────────────────────────────────────
 function BlogPreview() {
-  // Static blog posts — no blog API exists yet; these are real content, not mock data
-  const posts: BlogPost[] = [
-    {
-      id: '1',
-      title: 'Guía completa de CBD: beneficios, usos y dosis recomendadas',
-      excerpt:
-        'El CBD es uno de los cannabinoides más estudiados. Descubre cómo puede mejorar tu bienestar y cómo usarlo correctamente.',
-      image: '',
-      category: 'Educación',
-      readTime: '5 min',
-      slug: 'guia-cbd',
-    },
-    {
-      id: '2',
-      title: 'Diferencias entre indica, sativa e híbridos de cáñamo',
-      excerpt:
-        'Aprende las diferencias entre los tipos de cáñamo y cómo cada uno puede afectar tu experiencia de manera distinta.',
-      image: '',
-      category: 'Guías',
-      readTime: '4 min',
-      slug: 'indica-sativa-hibridos',
-    },
-    {
-      id: '3',
-      title: 'Cómo elegir el producto de cáñamo correcto para ti',
-      excerpt:
-        'Con tantas opciones disponibles, elegir puede ser abrumador. Esta guía te ayudará a encontrar el producto ideal según tus necesidades.',
-      image: '',
-      category: 'Consejos',
-      readTime: '6 min',
-      slug: 'como-elegir-producto',
-    },
-  ];
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/blog?por_pagina=3&estado=publicado')
+      .then((r) => r.json())
+      .then((data) => {
+        const items: BlogPost[] = data.datos?.datos ?? data.datos ?? [];
+        setPosts(items.slice(0, 3));
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <section
@@ -1026,32 +1007,64 @@ function BlogPreview() {
           subtitle="Contenido educativo sobre cáñamo, bienestar y más."
         />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {posts.map((post) => (
-            <article
-              key={post.id}
-              className="group rounded-card bg-white overflow-hidden border border-sc-border hover:shadow-md transition-shadow"
-            >
-              <div className="aspect-video bg-sc-beige flex items-center justify-center">
-                <span className="text-5xl" aria-hidden="true">
-                  🌿
-                </span>
-              </div>
-              <div className="p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-sc-periwinkle text-xs font-bold uppercase tracking-wider">
-                    {post.category}
-                  </span>
-                  <span className="text-sc-muted text-xs">{post.readTime} de lectura</span>
+          {loading
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-card bg-white overflow-hidden border border-sc-border animate-pulse"
+                >
+                  <div className="aspect-video bg-sc-beige" />
+                  <div className="p-6 space-y-3">
+                    <div className="h-3 bg-sc-beige rounded w-1/3" />
+                    <div className="h-5 bg-sc-beige rounded w-4/5" />
+                    <div className="h-3 bg-sc-beige rounded w-full" />
+                    <div className="h-3 bg-sc-beige rounded w-2/3" />
+                  </div>
                 </div>
-                <h3 className="text-sc-forest font-bold text-base leading-snug mb-2 group-hover:opacity-70 transition-opacity">
-                  {post.title}
-                </h3>
-                <p className="text-sc-muted text-sm leading-relaxed line-clamp-3">
-                  {post.excerpt}
-                </p>
-              </div>
-            </article>
-          ))}
+              ))
+            : posts.map((post) => {
+                const imgProps = getBlogImageProps(post);
+                return (
+                  <article
+                    key={post.id}
+                    className="group rounded-card bg-white overflow-hidden border border-sc-border hover:shadow-md transition-shadow"
+                  >
+                    <Link href={`/blog/${post.slug}`} className="block overflow-hidden aspect-video">
+                      <img
+                        src={imgProps.src}
+                        alt={imgProps.alt}
+                        title={imgProps.title}
+                        width={imgProps.width}
+                        height={imgProps.height}
+                        loading="lazy"
+                        decoding="async"
+                        onError={imgProps.onError}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </Link>
+                    <div className="p-6">
+                      <div className="flex items-center gap-3 mb-3">
+                        {post.blog_categories && (
+                          <span className="text-sc-periwinkle text-xs font-bold uppercase tracking-wider">
+                            {post.blog_categories.name}
+                          </span>
+                        )}
+                        {post.read_time_minutes && (
+                          <span className="text-sc-muted text-xs">{post.read_time_minutes} min de lectura</span>
+                        )}
+                      </div>
+                      <h3 className="text-sc-forest font-bold text-base leading-snug mb-2 group-hover:opacity-70 transition-opacity">
+                        {post.title}
+                      </h3>
+                      {post.excerpt && (
+                        <p className="text-sc-muted text-sm leading-relaxed line-clamp-3">
+                          {post.excerpt}
+                        </p>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
         </div>
       </div>
     </section>

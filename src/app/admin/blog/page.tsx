@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/UXHelpers';
 
 // ─── Types ───────────────────────────────────────────────────
 interface BlogCategoria {
@@ -352,6 +354,8 @@ export default function AdminBlogPage() {
   const [editandoCat, setEditandoCat] = useState<BlogCategoria | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const POR_PAGINA = 15;
 
   useEffect(() => {
@@ -402,7 +406,7 @@ export default function AdminBlogPage() {
     }
   }, [profile, tab, fetchPosts, fetchCatList, fetchCategorias]);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+  const showToast = (msg: string) => { toastSuccess(msg); };
 
   const handleSavePost = async (form: PostForm) => {
     setSaving(true);
@@ -459,19 +463,33 @@ export default function AdminBlogPage() {
   };
 
   const handleEliminarPost = async (id: string) => {
-    if (!confirm('¿Eliminar este artículo?')) return;
+    const confirmed = await confirm({
+      title: '¿Eliminar este artículo?',
+      message: 'El artículo será eliminado permanentemente. Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await supabase.from('blog_posts').delete().eq('id', id);
-      showToast('Artículo eliminado'); fetchPosts();
-    } catch { showToast('Error al eliminar'); }
+      toastSuccess('Artículo eliminado'); fetchPosts();
+    } catch { toastError('Error al eliminar'); }
   };
 
   const handleEliminarCat = async (id: string) => {
-    if (!confirm('¿Eliminar esta categoría?')) return;
+    const confirmed = await confirm({
+      title: '¿Eliminar esta categoría?',
+      message: 'Los artículos asociados perderán su categoría.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await supabase.from('blog_categories').delete().eq('id', id);
-      showToast('Categoría eliminada'); fetchCatList();
-    } catch { showToast('Error al eliminar'); }
+      toastSuccess('Categoría eliminada'); fetchCatList();
+    } catch { toastError('Error al eliminar'); }
   };
 
   const handleBulkArchivar = async () => {
@@ -504,7 +522,8 @@ export default function AdminBlogPage() {
   if (!profile || !['admin', 'staff'].includes(profile.role)) return null;
 
   return (
-    <AdminLayout title="Blog" subtitle="Gestión de artículos, categorías y SEO">
+    <AdminLayout title="Blog" subtitle="Gestión de artículos y categorías">
+      {confirmDialog}
       {toast && <div className="fixed top-4 right-4 z-50 bg-sc-forest text-white px-4 py-3 rounded-xl shadow-lg text-sm animate-slide-up">{toast}</div>}
 
       <ModalPost open={modalPost} onClose={() => { setModalPost(false); setEditandoPost(null); }}

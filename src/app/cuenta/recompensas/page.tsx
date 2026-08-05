@@ -23,11 +23,11 @@ interface RewardTransaction {
   created_at: string;
 }
 
-const TIER_CONFIG: Record<string, { label: string; color: string; bg: string; next: string | null; nextPoints: number }> = {
-  crew: { label: 'Crew', color: 'text-sc-forest', bg: 'bg-sc-beige', next: 'OG', nextPoints: 500 },
-  og: { label: 'OG', color: 'text-sc-periwinkle', bg: 'bg-sc-periwinkle/10', next: 'Legend', nextPoints: 2000 },
-  legend: { label: 'Legend', color: 'text-amber-700', bg: 'bg-amber-50', next: 'Icon', nextPoints: 5000 },
-  icon: { label: 'Icon', color: 'text-sc-cream', bg: 'bg-sc-forest', next: null, nextPoints: 0 },
+const TIER_CONFIG: Record<string, { label: string; color: string; bg: string; next: string | null; nextPoints: number; minPoints: number }> = {
+  crew: { label: 'Crew', color: 'text-sc-forest', bg: 'bg-sc-beige', next: 'OG', nextPoints: 500, minPoints: 0 },
+  og: { label: 'OG', color: 'text-sc-periwinkle', bg: 'bg-sc-periwinkle/10', next: 'Legend', nextPoints: 2000, minPoints: 500 },
+  legend: { label: 'Legend', color: 'text-amber-700', bg: 'bg-amber-50', next: 'Icon', nextPoints: 5000, minPoints: 2000 },
+  icon: { label: 'Icon', color: 'text-sc-cream', bg: 'bg-sc-forest', next: null, nextPoints: 0, minPoints: 5000 },
 };
 
 const TX_TYPE_LABELS: Record<string, { label: string; sign: string; color: string }> = {
@@ -63,6 +63,7 @@ export default function RecompensasPage() {
   const [transactions, setTransactions] = useState<RewardTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copyMsg, setCopyMsg] = useState('');
 
   const loadRewards = useCallback(async () => {
     if (!user) return;
@@ -96,7 +97,7 @@ export default function RecompensasPage() {
 
   const tier = TIER_CONFIG[rewards?.tier || 'crew'] || TIER_CONFIG.crew;
   const progressPct = rewards && tier.nextPoints > 0
-    ? Math.min(100, (rewards.points_lifetime / tier.nextPoints) * 100)
+    ? Math.min(100, Math.max(0, ((rewards.points_lifetime - tier.minPoints) / (tier.nextPoints - tier.minPoints)) * 100))
     : 100;
 
   return (
@@ -181,10 +182,19 @@ export default function RecompensasPage() {
                     {rewards.referral_code}
                   </code>
                   <button
-                    onClick={() => navigator.clipboard?.writeText(rewards.referral_code || '')}
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(rewards.referral_code || '');
+                        setCopyMsg('¡Copiado!');
+                        setTimeout(() => setCopyMsg(''), 2000);
+                      } catch {
+                        setCopyMsg('Error al copiar');
+                        setTimeout(() => setCopyMsg(''), 2000);
+                      }
+                    }}
                     className="px-4 py-2.5 border border-sc-border rounded-sm2 text-sc-forest text-sm font-medium hover:bg-sc-beige transition-colors"
                   >
-                    Copiar
+                    {copyMsg || 'Copiar'}
                   </button>
                 </div>
                 <p className="text-sc-muted text-xs mt-2">Comparte tu código y gana puntos por cada amigo que compre</p>

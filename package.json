@@ -41,7 +41,7 @@
   "scripts": {
     "dev": "next dev -p 4028",
     "build": "next build",
-    "start": "next dev -p 4028",
+    "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md,json}\"",
@@ -76,6 +76,7 @@
     "react": "19.0.3",
     "react-dom": "19.0.3",
     "recharts": "^2.15.2",
+    "resend": "6.18.1",
     "stripe": "^22.4.0"
   },
   "devDependencies": {

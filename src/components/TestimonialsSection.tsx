@@ -14,7 +14,7 @@ const testimonials = [
 {
   id: 2,
   productName: 'Midnight Blueberry Drops',
-  productImage: "https://img.rocket.new/generatedImages/rocket_gen_img_116106b26-1767800509499.png",
+  productImage: "https://img.rocket.new/generatedImages/rocket_gen_img_1336e2ebc-1772460531497.png",
   productAlt: 'Small thumbnail of Midnight Blueberry Drops sleep gummies',
   quote: '"I finally sleep through the night! Street Candy\'s has completely changed my routine. The quality is unmatched and shipping was super fast."',
   reviewer: 'MARCUS T.',

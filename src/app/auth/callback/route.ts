@@ -14,10 +14,10 @@ function isSafeRedirectPath(path: string): boolean {
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const nextParam = searchParams.get('next') ?? '/';
+  const nextParam = searchParams.get('next') ?? '/cuenta';
 
   // Validate the redirect target to prevent open redirect attacks
-  const next = isSafeRedirectPath(nextParam) ? nextParam : '/';
+  const next = isSafeRedirectPath(nextParam) ? nextParam : '/cuenta';
 
   if (code) {
     const supabase = await createClient();

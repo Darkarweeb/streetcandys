@@ -4,6 +4,8 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import type { DbReview } from '@/lib/products/types';
 import { createClient } from '@/lib/supabase/client';
 
+import { useConfirm } from '@/components/ui/UXHelpers';
+
 type AdminReview = DbReview & {
   product_name?: string;
   reviewer_name?: string;
@@ -40,6 +42,7 @@ function ReviewDetailDrawer({ review, onClose, onAction }: {
   const [reply, setReply] = useState(review.admin_reply ?? '');
   const [savingReply, setSavingReply] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const handleModerate = async (status: string) => {
     setActionLoading(status);
@@ -60,7 +63,14 @@ function ReviewDetailDrawer({ review, onClose, onAction }: {
   };
 
   const handleDelete = async () => {
-    if (!confirm('¿Eliminar esta reseña permanentemente?')) return;
+    const confirmed = await confirm({
+      title: '¿Eliminar esta reseña?',
+      message: 'La reseña será eliminada permanentemente. Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     setActionLoading('delete');
     await onAction(review.id, 'eliminar');
     setActionLoading(null);
@@ -71,6 +81,7 @@ function ReviewDetailDrawer({ review, onClose, onAction }: {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex justify-end" onClick={onClose}>
+      {confirmDialog}
       <div className="bg-white w-full max-w-lg h-full overflow-y-auto shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10">

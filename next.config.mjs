@@ -172,9 +172,10 @@ const nextConfig = {
         ...(Array.isArray(existingExternals) ? existingExternals : [existingExternals]),
         ({ request }, callback) => {
           if (request && CAPACITOR_EXTERNALS.some((pkg) => request === pkg || request.startsWith(pkg + '/'))) {
-            // Return an empty module — the runtime guards in src/lib/mobile/index.ts
-            // ensure these code paths are never reached on web anyway.
-            return callback(null, 'commonjs ' + request);
+            // Use 'var' format so webpack emits a browser-safe stub (an empty object literal)
+            // rather than a require() call which does not exist in the browser and causes
+            // "undefined is not an object (evaluating 'originalFactory.call')".
+            return callback(null, 'var {}');
           }
           callback();
         },

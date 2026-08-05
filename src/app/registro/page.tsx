@@ -14,7 +14,7 @@ const COUNTRIES = [
 
 export default function RegistroPage() {
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { signUp, resendConfirmationEmail } = useAuth();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -26,6 +26,9 @@ export default function RegistroPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const passwordStrength = (() => {
     if (password.length === 0) return 0;
@@ -39,6 +42,31 @@ export default function RegistroPage() {
 
   const strengthLabel = ['', 'Débil', 'Regular', 'Buena', 'Fuerte'][passwordStrength];
   const strengthColor = ['', '#FF3B3B', '#FFD700', '#ff69b4', '#e91e8c'][passwordStrength];
+
+  const startCooldown = () => {
+    setResendCooldown(60);
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) { clearInterval(interval); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleResend = async () => {
+    if (resendCooldown > 0 || resendLoading) return;
+    setResendLoading(true);
+    setResendMessage('');
+    try {
+      await resendConfirmationEmail(email);
+      setResendMessage('✅ Correo reenviado. Revisa tu bandeja de entrada.');
+      startCooldown();
+    } catch {
+      setResendMessage('❌ No se pudo reenviar. Intenta en unos minutos.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +89,15 @@ export default function RegistroPage() {
     try {
       await signUp({ email, password, fullName, countryCode });
       setSuccess(true);
+
+      // Fire-and-forget welcome email — registration success is never blocked by this
+      fetch('/api/email/welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, fullName }),
+      }).catch((err) => {
+        console.warn('[registro] Welcome email request failed (non-fatal):', err);
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al crear la cuenta.';
       if (msg.includes('already registered') || msg.includes('already exists')) {
@@ -94,27 +131,100 @@ export default function RegistroPage() {
         className="min-h-screen flex flex-col items-center justify-center px-4 py-16"
         style={{ background: 'linear-gradient(135deg, #fff0f5 0%, #ffe4ef 60%, #ffd6e8 100%)' }}
       >
-        <Link href="/" className="mb-8">
+        {/* Decorative circles */}
+        <div className="fixed top-0 right-0 w-80 h-80 rounded-full pointer-events-none opacity-30" style={{ background: 'radial-gradient(circle, #ff69b4 0%, transparent 70%)', transform: 'translate(40%, -40%)' }} aria-hidden="true" />
+        <div className="fixed bottom-0 left-0 w-64 h-64 rounded-full pointer-events-none opacity-20" style={{ background: 'radial-gradient(circle, #e91e8c 0%, transparent 70%)', transform: 'translate(-40%, 40%)' }} aria-hidden="true" />
+
+        <Link href="/" className="mb-8 relative z-10">
           <AppLogo variant="light" height={52} />
         </Link>
-        <div className="w-full max-w-md bg-white rounded-3xl p-8 shadow-xl text-center" style={{ border: '1.5px solid #ffd6e8' }}>
-          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5 text-3xl shadow-md" style={{ background: 'linear-gradient(135deg, #e91e8c 0%, #ff69b4 100%)' }}>
-            🎉
+
+        <div className="w-full max-w-md relative z-10">
+          <div className="bg-white rounded-3xl shadow-xl overflow-hidden" style={{ border: '1.5px solid #ffd6e8' }}>
+            {/* Header gradient banner */}
+            <div className="px-8 pt-8 pb-6 text-center" style={{ background: 'linear-gradient(135deg, #e91e8c 0%, #ff69b4 100%)' }}>
+              <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl shadow-lg" style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)' }}>
+                🎉
+              </div>
+              <h2 className="text-2xl font-black text-white mb-1">Bienvenido al Crew</h2>
+              <p className="text-sm text-white opacity-90">Street Candy&apos;s — Premium Hemp Wellness</p>
+            </div>
+
+            {/* Body */}
+            <div className="px-8 py-6">
+              {/* Email confirmation notice */}
+              <div className="rounded-2xl p-4 mb-5 text-center" style={{ background: 'rgba(233,30,140,0.06)', border: '1px solid rgba(233,30,140,0.2)' }}>
+                <p className="text-sm font-semibold mb-1" style={{ color: '#1a1a1a' }}>
+                  Confirma tu correo para activar tu cuenta
+                </p>
+                <p className="text-xs" style={{ color: '#888' }}>
+                  Enviamos un enlace de confirmación a{' '}
+                  <span className="font-bold" style={{ color: '#e91e8c' }}>{email}</span>
+                </p>
+              </div>
+
+              {/* Benefits */}
+              <div className="space-y-3 mb-6">
+                {[
+                  { icon: '🏆', title: 'Programa de Recompensas', desc: 'Acumula puntos en cada compra' },
+                  { icon: '🎁', title: 'Descuentos Exclusivos', desc: 'Ofertas solo para miembros del crew' },
+                  { icon: '🌿', title: 'Contenido Educativo', desc: 'Guías y artículos sobre hemp y bienestar' },
+                  { icon: '🚀', title: 'Acceso Anticipado', desc: 'Sé el primero en conocer nuevos productos' },
+                ].map((b) => (
+                  <div key={b.title} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: '#fff8fb' }}>
+                    <span className="text-xl flex-shrink-0">{b.icon}</span>
+                    <div>
+                      <p className="text-xs font-bold" style={{ color: '#1a1a1a' }}>{b.title}</p>
+                      <p className="text-xs" style={{ color: '#888' }}>{b.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Resend section */}
+              <div className="text-center mb-5">
+                <p className="text-xs mb-3" style={{ color: '#aaa' }}>
+                  ¿No recibiste el correo? Revisa tu carpeta de spam o reenvíalo.
+                </p>
+                <button
+                  onClick={handleResend}
+                  disabled={resendLoading || resendCooldown > 0}
+                  className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-2.5 rounded-full border-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ borderColor: '#e91e8c', color: '#e91e8c', background: 'transparent' }}
+                >
+                  {resendLoading ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Enviando...
+                    </>
+                  ) : resendCooldown > 0 ? (
+                    `Reenviar en ${resendCooldown}s`
+                  ) : (
+                    '📧 Reenviar confirmación'
+                  )}
+                </button>
+                {resendMessage && (
+                  <p className="text-xs mt-2 font-medium" style={{ color: resendMessage.startsWith('✅') ? '#16a34a' : '#c0006a' }}>
+                    {resendMessage}
+                  </p>
+                )}
+              </div>
+
+              {/* CTA */}
+              <Link
+                href="/iniciar-sesion"
+                className="block w-full text-center font-bold text-sm rounded-full py-4 text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(135deg, #e91e8c 0%, #ff69b4 100%)' }}
+              >
+                🍬 Ya confirmé — Iniciar sesión
+              </Link>
+            </div>
           </div>
-          <h2 className="text-2xl font-black mb-2" style={{ color: '#1a1a1a' }}>¡Ya eres parte del crew!</h2>
-          <p className="text-sm mb-1" style={{ color: '#888' }}>
-            Te enviamos un correo a <span className="font-bold" style={{ color: '#e91e8c' }}>{email}</span>.
+
+          <p className="text-center text-xs mt-5" style={{ color: '#aaa' }}>
+            Al confirmar tu correo aceptas nuestros{' '}
+            <Link href="/terminos" className="underline" style={{ color: '#e91e8c' }}>términos y condiciones</Link>.
           </p>
-          <p className="text-sm mb-8" style={{ color: '#888' }}>
-            Verifica tu cuenta para empezar a explorar.
-          </p>
-          <Link
-            href="/iniciar-sesion"
-            className="inline-block font-bold text-sm rounded-full px-8 py-4 text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5"
-            style={{ background: 'linear-gradient(135deg, #e91e8c 0%, #ff69b4 100%)' }}
-          >
-            🍬 Iniciar sesión
-          </Link>
         </div>
       </div>
     );

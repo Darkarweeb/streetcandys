@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import CuentaLayout from '@/components/cuenta/CuentaLayout';
 import { createClient } from '@/lib/supabase/client';
 import type { DbDireccion } from '@/lib/payment/types';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/UXHelpers';
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 interface ProfileFormData {
@@ -108,6 +110,8 @@ export default function PerfilPage() {
   const { profile, user, refreshProfile, updatePassword, signOut } = useAuth();
   const supabase = useRef(createClient()).current;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   /* Profile form */
   const [profileForm, setProfileForm] = useState<ProfileFormData>({ fullName: '', phone: '', dateOfBirth: '' });
@@ -223,10 +227,12 @@ export default function PerfilPage() {
         .eq('id', user.id);
       if (error) throw new Error(error.message);
       await refreshProfile();
-      setProfileSuccess('Perfil actualizado correctamente.');
+      toastSuccess('✓ Perfil actualizado correctamente');
       setAvatarFile(null);
     } catch (err) {
-      setProfileError(err instanceof Error ? err.message : 'Error actualizando perfil.');
+      const msg = err instanceof Error ? err.message : 'Error actualizando perfil.';
+      setProfileError(msg);
+      toastError(msg);
     } finally {
       setSavingProfile(false);
     }
@@ -242,10 +248,13 @@ export default function PerfilPage() {
     setSavingPassword(true);
     try {
       await updatePassword(passwordForm.newPassword);
+      toastSuccess('✓ Contraseña actualizada correctamente');
       setPasswordSuccess('Contraseña actualizada correctamente.');
       setPasswordForm({ newPassword: '', confirmPassword: '' });
     } catch (err) {
-      setPasswordError(err instanceof Error ? err.message : 'Error actualizando contraseña.');
+      const msg = err instanceof Error ? err.message : 'Error actualizando contraseña.';
+      setPasswordError(msg);
+      toastError(msg);
     } finally {
       setSavingPassword(false);
     }
@@ -253,7 +262,14 @@ export default function PerfilPage() {
 
   /* ── Sign out ── */
   const handleSignOut = async () => {
-    if (!confirm('¿Cerrar sesión?')) return;
+    const confirmed = await confirm({
+      title: '¿Cerrar sesión?',
+      message: 'Se cerrará tu sesión en este dispositivo.',
+      confirmLabel: 'Cerrar sesión',
+      cancelLabel: 'Cancelar',
+      variant: 'default',
+    });
+    if (!confirmed) return;
     setSigningOut(true);
     try { await signOut(); } catch { setSigningOut(false); }
   };
@@ -263,6 +279,7 @@ export default function PerfilPage() {
 
   return (
     <CuentaLayout>
+      {confirmDialog}
       <div className="animate-fade-in space-y-6">
 
         {/* ── Page header ── */}

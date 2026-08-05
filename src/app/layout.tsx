@@ -8,6 +8,7 @@ import GoogleAnalytics from '@/components/GoogleAnalytics';
 import CapacitorProvider from '@/components/mobile/CapacitorProvider';
 import OfflineBanner from '@/components/mobile/OfflineBanner';
 import ChunkErrorHandler from '@/components/ChunkErrorHandler';
+import { ToastProvider } from '@/components/ui/Toast';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -124,7 +125,7 @@ export default function RootLayout({
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){var _o=window.onerror;window.onerror=function(m,s,l,c,e){var ms=String(m||'');if(ms.indexOf('originalFactory.call')!==-1||ms.indexOf("reading 'call'")!==-1||ms.indexOf('Loading chunk')!==-1||ms.indexOf('ChunkLoadError')!==-1){try{if(window.caches){window.caches.keys().then(function(k){k.forEach(function(n){window.caches.delete(n);});});}}catch(ex){}window.location.reload();return true;}if(_o)return _o.apply(this,arguments);};})();`,
+            __html: `(function(){var RCK='__sc_chunk_reload_count__';var MAX=2;function rc(){try{return parseInt(sessionStorage.getItem(RCK)||'0',10);}catch(e){return 0;}}function ic(){try{var c=rc()+1;sessionStorage.setItem(RCK,String(c));}catch(e){}}function clr(){try{if(window.caches){window.caches.keys().then(function(k){k.forEach(function(n){window.caches.delete(n);});});}}catch(e){}try{var ls=window.localStorage;if(ls){var i=0;while(i<ls.length){var k=ls.key(i);if(k&&(k.indexOf('__RSC_')!==-1||k.indexOf('next-router')!==-1||k.indexOf('_next')!==-1||k.indexOf('__NEXT_')!==-1)){ls.removeItem(k);}else{i++;}}}}catch(e){}try{var ss=window.sessionStorage;if(ss){var j=0;while(j<ss.length){var sk=ss.key(j);if(sk&&sk!==RCK&&(sk.indexOf('__RSC_')!==-1||sk.indexOf('next-router')!==-1||sk.indexOf('_next')!==-1||sk.indexOf('__NEXT_')!==-1)){ss.removeItem(sk);}else{j++;}}}}catch(e){}}function isChunk(m){return m.indexOf('originalFactory.call')!==-1||m.indexOf("reading 'call'")!==-1||m.indexOf('Loading chunk')!==-1||m.indexOf('ChunkLoadError')!==-1;}function doReload(){if(rc()>=MAX){return;}ic();clr();window.location.reload();}var _o=window.onerror;window.onerror=function(m,s,l,c,e){if(isChunk(String(m||''))){doReload();return true;}if(_o)return _o.apply(this,arguments);};window.addEventListener('unhandledrejection',function(ev){var ms=String(ev&&ev.reason&&ev.reason.message||ev&&ev.reason||'');if(isChunk(ms)){ev.preventDefault();doReload();}});})();`,
           }}
         />
 
@@ -142,10 +143,12 @@ export default function RootLayout({
           <Suspense fallback={null}>
             <GoogleAnalytics />
           </Suspense>
-          <CapacitorProvider>
-            <OfflineBanner />
-            {children}
-          </CapacitorProvider>
+          <ToastProvider>
+            <CapacitorProvider>
+              <OfflineBanner />
+              {children}
+            </CapacitorProvider>
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

@@ -43,6 +43,7 @@ interface AuthContextType {
   updatePassword: (newPassword: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
   isEmailVerified: () => boolean;
+  resendConfirmationEmail: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -220,6 +221,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return user?.email_confirmed_at != null;
   };
 
+  const resendConfirmationEmail = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback`,
+      },
+    });
+    if (error) throw error;
+  };
+
   const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
   const isCustomer = profile?.role === 'customer';
 
@@ -237,6 +249,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     updatePassword,
     refreshProfile,
     isEmailVerified,
+    resendConfirmationEmail,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
