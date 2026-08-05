@@ -101,6 +101,7 @@ export default function RegistroPage() {
         console.warn('[registro] Welcome email request failed (non-fatal):', err);
       });
     } catch (err: unknown) {
+      console.log('RAW ERROR', err);
       console.error('[registro] CATCH BLOCK — error details:');
       console.error('  typeof error         :', typeof err);
       console.error('  String(error)        :', String(err));

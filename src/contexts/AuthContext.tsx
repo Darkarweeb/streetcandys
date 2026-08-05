@@ -181,8 +181,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     console.log('[signUp] AFTER supabase.auth.signUp() resolved');
     console.log('[signUp] RAW RESPONSE:', JSON.stringify(rawResponse, null, 2));
+    console.log('[signUp] RAW RESPONSE (unserialised):', rawResponse);
+    console.log('[signUp] RAW data:', data);
+    console.log('[signUp] RAW error:', error);
 
     if (error) {
+      console.log('RAW ERROR', error);
       console.error('[signUp] ERROR DETAILS:');
       console.error('  typeof error         :', typeof error);
       console.error('  String(error)        :', String(error));
