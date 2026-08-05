@@ -163,7 +163,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       },
     });
 
-    if (error) throw error;
+    if (error) throw new Error(error.message || 'Error al registrarse. Intenta de nuevo.');
 
     // If profile wasn't auto-created by trigger, create it manually
     if (data.user) {
