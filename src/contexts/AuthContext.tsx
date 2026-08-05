@@ -181,24 +181,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw error;
     }
 
-    // If profile wasn't auto-created by trigger, create it manually
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: data.user.id,
-          email,
-          full_name: fullName,
-          country_code: countryCode,
-          role: 'customer',
-          age_verified: false,
-          is_active: true,
-        }, { onConflict: 'id' });
-
-      // Non-fatal: trigger may have already created it
-      if (profileError && profileError.code !== '23505') {
-        console.warn('Perfil no pudo crearse automáticamente:', profileError.message);
-      }
+    // Profile is created automatically by the handle_new_user() SECURITY DEFINER trigger
+    // on auth.users INSERT. No manual upsert needed — and it would fail anyway because
+    // at this point there is no active session (email confirmation pending), so
+    // auth.uid() returns NULL and the profiles_insert_own RLS policy blocks the insert.
+    if (!data.user) {
+      console.warn('[signUp] signUp returned no user object — email may already be registered');
     }
   };
 
