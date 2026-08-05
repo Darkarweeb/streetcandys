@@ -13,18 +13,28 @@ function isSafeRedirectPath(path: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams, origin, pathname } = new URL(request.url);
 
   const code = searchParams.get('code');
   const type = searchParams.get('type') as EmailOtpType | null;
   const nextParam = searchParams.get('next') ?? '/cuenta';
   const next = isSafeRedirectPath(nextParam) ? nextParam : '/cuenta';
 
+  // ── DEBUG: recovery flow diagnostics (temporary) ─────────────────────────
+  const paramNames = Array.from(searchParams.keys());
+  console.log('[auth/callback] DEBUG pathname:', pathname);
+  console.log('[auth/callback] DEBUG query param names received:', paramNames);
+  console.log('[auth/callback] DEBUG detected type:', type);
+  // ─────────────────────────────────────────────────────────────────────────
+
   // ── Path A (recovery): PKCE recovery flow ────────────────────────────────
   // Supabase sends the parameter as "token" in recovery links.
   // token_hash is kept as fallback for compatibility.
   if (type === 'recovery') {
+    console.log('[auth/callback] DEBUG recovery branch: EXECUTING');
+
     const recoveryToken = searchParams.get('token') ?? searchParams.get('token_hash');
+    console.log('[auth/callback] DEBUG recoveryToken present:', recoveryToken !== null);
 
     if (recoveryToken) {
       const supabase = await createClient();
@@ -34,8 +44,10 @@ export async function GET(request: NextRequest) {
       });
 
       if (!error) {
+        console.log('[auth/callback] DEBUG verifyOtp: SUCCESS');
         // Confirm session exists before redirecting
         const session = data?.session;
+        console.log('[auth/callback] DEBUG session present after verifyOtp:', session !== null);
         if (session) {
           return NextResponse.redirect(`${origin}/nueva-contrasena`);
         }
@@ -45,14 +57,22 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // Expose the actual Supabase error temporarily for debugging
+      // Log the actual Supabase error (message and status only — no tokens)
+      console.log('[auth/callback] DEBUG verifyOtp: FAILED');
+      console.log('[auth/callback] DEBUG verifyOtp error message:', error.message);
+      console.log('[auth/callback] DEBUG verifyOtp error code:', (error as any).code ?? 'n/a');
+      console.log('[auth/callback] DEBUG verifyOtp error status:', (error as any).status ?? 'n/a');
+
+      // Expose the actual Supabase error for debugging
       const errorMsg = encodeURIComponent(error.message ?? 'unknown');
+      const errorCode = encodeURIComponent((error as any).code ?? (error as any).status ?? 'unknown');
       return NextResponse.redirect(
-        `${origin}/iniciar-sesion?error=recovery-failed&detail=${errorMsg}`
+        `${origin}/iniciar-sesion?error=recovery-failed&detail=${errorMsg}&code=${errorCode}`
       );
     }
 
     // type=recovery but no token at all
+    console.log('[auth/callback] DEBUG recovery branch: no token found in params');
     return NextResponse.redirect(`${origin}/iniciar-sesion?error=token-ausente`);
   }
 
