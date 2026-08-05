@@ -16,29 +16,61 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
 
   const code = searchParams.get('code');
-  const tokenHash = searchParams.get('token_hash') ?? searchParams.get('token');
   const type = searchParams.get('type') as EmailOtpType | null;
   const nextParam = searchParams.get('next') ?? '/cuenta';
   const next = isSafeRedirectPath(nextParam) ? nextParam : '/cuenta';
 
-  // ── Path A: token_hash flow (PKCE — used by password recovery action_link) ──
+  // ── Path A (recovery): PKCE recovery flow ────────────────────────────────
+  // Supabase sends the parameter as "token" in recovery links.
+  // token_hash is kept as fallback for compatibility.
+  if (type === 'recovery') {
+    const recoveryToken = searchParams.get('token') ?? searchParams.get('token_hash');
+
+    if (recoveryToken) {
+      const supabase = await createClient();
+      const { data, error } = await supabase.auth.verifyOtp({
+        token_hash: recoveryToken,
+        type: 'recovery',
+      });
+
+      if (!error) {
+        // Confirm session exists before redirecting
+        const session = data?.session;
+        if (session) {
+          return NextResponse.redirect(`${origin}/nueva-contrasena`);
+        }
+        // verifyOtp succeeded but no session — expose this state
+        return NextResponse.redirect(
+          `${origin}/iniciar-sesion?error=sesion-no-establecida`
+        );
+      }
+
+      // Expose the actual Supabase error temporarily for debugging
+      const errorMsg = encodeURIComponent(error.message ?? 'unknown');
+      return NextResponse.redirect(
+        `${origin}/iniciar-sesion?error=recovery-failed&detail=${errorMsg}`
+      );
+    }
+
+    // type=recovery but no token at all
+    return NextResponse.redirect(`${origin}/iniciar-sesion?error=token-ausente`);
+  }
+
+  // ── Path B: token_hash flow (PKCE — signup or other types) ───────────────
+  const tokenHash = searchParams.get('token_hash') ?? searchParams.get('token');
   if (tokenHash && type) {
     const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
 
     if (!error) {
-      if (type === 'recovery') {
-        return NextResponse.redirect(`${origin}/nueva-contrasena`);
-      }
       // signup via token_hash — session is now in cookies, go to /cuenta
       return NextResponse.redirect(`${origin}/cuenta`);
     }
 
-    // verifyOtp failed — send to login with error
     return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
   }
 
-  // ── Path B: PKCE code flow (OAuth, magic link) ────────────────────────────
+  // ── Path C: PKCE code flow (OAuth, magic link) ────────────────────────────
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -50,10 +82,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
   }
 
-  // ── Path C: Implicit flow — session arrives in URL hash (browser-only) ────
+  // ── Path D: Implicit flow — session arrives in URL hash (browser-only) ────
   // The hash fragment is never sent to the server. Forward to the client-side
   // handler which will read window.location.hash and call setSession().
-  // Preserve the ?next= param so the client page knows where to redirect.
   const clientUrl = new URL(`${origin}/auth/confirmar`);
   if (nextParam && isSafeRedirectPath(nextParam)) {
     clientUrl.searchParams.set('next', nextParam);
