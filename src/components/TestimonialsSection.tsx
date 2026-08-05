@@ -23,7 +23,7 @@ const testimonials = [
 {
   id: 3,
   productName: 'Tropical Punch Pre-Rolls',
-  productImage: "https://img.rocket.new/generatedImages/rocket_gen_img_123a4b574-1785340304634.png",
+  productImage: "https://img.rocket.new/generatedImages/rocket_gen_img_118b43080-1785876653204.png",
   productAlt: 'Small thumbnail of Tropical Punch Pre-Rolls product',
   quote: '"Top shelf quality every single time. I\'ve tried many brands but Street Candy\'s is on another level. The pre-rolls are perfectly crafted."',
   reviewer: 'SARAH K.',
@@ -32,7 +32,7 @@ const testimonials = [
 {
   id: 4,
   productName: 'Lemon Haze Flower',
-  productImage: "https://images.unsplash.com/photo-1594663787096-bb4ce20f6a86",
+  productImage: "https://images.unsplash.com/photo-1612369300180-ed761b589b64",
   productAlt: 'Small thumbnail of Lemon Haze Flower product',
   quote: '"The Lemon Haze is exactly what I needed for my creative sessions. Smooth, flavorful, and the effects are consistent every time."',
   reviewer: 'DAVID R.',

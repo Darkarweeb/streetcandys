@@ -11,7 +11,7 @@
 ALTER FUNCTION public.admin_exists()
   SET search_path = public, pg_temp;
 
-ALTER FUNCTION public.setup_first_admin(TEXT, TEXT)
+ALTER FUNCTION public.setup_first_admin(UUID)
   SET search_path = public, pg_temp;
 
 ALTER FUNCTION public.assign_order_number()

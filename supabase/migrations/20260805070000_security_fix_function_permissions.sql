@@ -277,7 +277,7 @@ $$;
 -- ============================================================
 
 -- Administrative functions
-REVOKE EXECUTE ON FUNCTION public.setup_first_admin(TEXT, TEXT) FROM anon, authenticated, PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.setup_first_admin(UUID) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.get_admin_product_detail(TEXT) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.send_admin_announcement(TEXT, TEXT, TEXT, TEXT) FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.publish_scheduled_posts() FROM anon, authenticated, PUBLIC;
