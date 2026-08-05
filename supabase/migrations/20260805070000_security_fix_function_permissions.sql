@@ -295,32 +295,58 @@ REVOKE EXECUTE ON FUNCTION public.update_promotions_updated_at() FROM anon, auth
 
 -- upsert_product_inventory: called via RPC from admin API routes.
 -- Keep authenticated access. Add internal is_admin() guard.
-REVOKE EXECUTE ON FUNCTION public.upsert_product_inventory(UUID, INTEGER, INTEGER) FROM anon;
-GRANT EXECUTE ON FUNCTION public.upsert_product_inventory(UUID, INTEGER, INTEGER) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.upsert_product_inventory(UUID, INTEGER, INTEGER, BOOLEAN, UUID) FROM anon;
+GRANT EXECUTE ON FUNCTION public.upsert_product_inventory(UUID, INTEGER, INTEGER, BOOLEAN, UUID) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.upsert_product_inventory(
   p_product_id          UUID,
   p_quantity            INTEGER,
-  p_low_stock_threshold INTEGER DEFAULT 5
+  p_low_stock_threshold INTEGER DEFAULT 5,
+  p_allow_backorder     BOOLEAN DEFAULT false,
+  p_variant_id          UUID DEFAULT NULL
 )
-RETURNS VOID
+RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_inv_id UUID;
 BEGIN
   -- Security: only admins and staff may update inventory
   IF NOT public.is_admin_or_staff() THEN
     RAISE EXCEPTION 'Access denied: admin or staff role required to update inventory';
   END IF;
 
-  INSERT INTO public.inventory (product_id, quantity, low_stock_threshold, updated_at)
-  VALUES (p_product_id, p_quantity, p_low_stock_threshold, NOW())
-  ON CONFLICT (product_id)
-  DO UPDATE SET
-    quantity            = EXCLUDED.quantity,
-    low_stock_threshold = EXCLUDED.low_stock_threshold,
-    updated_at          = NOW();
+  -- Validate quantity
+  IF p_quantity < 0 THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Quantity cannot be negative');
+  END IF;
+
+  IF p_variant_id IS NOT NULL THEN
+    INSERT INTO public.inventory (product_id, variant_id, quantity, low_stock_threshold, allow_backorder)
+    VALUES (p_product_id, p_variant_id, p_quantity, p_low_stock_threshold, p_allow_backorder)
+    ON CONFLICT (product_id, variant_id) DO UPDATE
+      SET quantity = EXCLUDED.quantity,
+          low_stock_threshold = EXCLUDED.low_stock_threshold,
+          allow_backorder = EXCLUDED.allow_backorder,
+          updated_at = now()
+    RETURNING id INTO v_inv_id;
+  ELSE
+    INSERT INTO public.inventory (product_id, quantity, low_stock_threshold, allow_backorder)
+    VALUES (p_product_id, p_quantity, p_low_stock_threshold, p_allow_backorder)
+    ON CONFLICT (product_id) WHERE variant_id IS NULL DO UPDATE
+      SET quantity = EXCLUDED.quantity,
+          low_stock_threshold = EXCLUDED.low_stock_threshold,
+          allow_backorder = EXCLUDED.allow_backorder,
+          updated_at = now()
+    RETURNING id INTO v_inv_id;
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'inventory_id', v_inv_id);
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$;
 

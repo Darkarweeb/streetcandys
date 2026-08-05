@@ -47,7 +47,7 @@ ALTER FUNCTION public.generate_order_number()
 ALTER FUNCTION public.get_admin_product_detail(TEXT)
   SET search_path = public, pg_temp;
 
-ALTER FUNCTION public.upsert_product_inventory(UUID, INTEGER, INTEGER)
+ALTER FUNCTION public.upsert_product_inventory(UUID, INTEGER, INTEGER, BOOLEAN, UUID)
   SET search_path = public, pg_temp;
 
 ALTER FUNCTION public.update_promotions_updated_at()
