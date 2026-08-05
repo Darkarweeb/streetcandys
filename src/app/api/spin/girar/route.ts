@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient as createServerSupabaseClient } from '@/lib/supabase/server';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -25,12 +24,16 @@ function generateCouponCode(): string {
 }
 
 // ── POST /api/spin/girar ──────────────────────────────────────────────────────
-// Validates email uniqueness + email confirmation, records spin, creates coupon
-// only when email is verified.
 
 export async function POST(req: NextRequest) {
   try {
-    const body: SpinRequest = await req.json();
+    let body: SpinRequest;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: 'Cuerpo de solicitud inválido' }, { status: 400 });
+    }
+
     const { email, nombre, consent, prizeLabel, prizeValue, discountType, couponExpirationDays, minimumPurchase } = body;
 
     // ── Basic validation ──────────────────────────────────────────────────────
@@ -47,18 +50,23 @@ export async function POST(req: NextRequest) {
     const adminClient = createAdminClient();
 
     // ── Check if email already spun ───────────────────────────────────────────
-    const { data: existingLead } = await adminClient
+    const { data: existingLead, error: checkError } = await adminClient
       .from('spin_leads')
-      .select('id, coupon_code, prize, verification_status')
+      .select('id, coupon_code, prize_label, verification_status')
       .eq('email', normalizedEmail)
       .maybeSingle();
+
+    if (checkError) {
+      console.error('spin_leads check error:', checkError);
+      return NextResponse.json({ error: 'Error al verificar el correo' }, { status: 500 });
+    }
 
     if (existingLead) {
       return NextResponse.json(
         {
           error: 'already_spun',
           message: 'Este correo ya participó en la ruleta.',
-          existingPrize: existingLead.prize,
+          existingPrize: existingLead.prize_label,
           existingCoupon: existingLead.coupon_code,
           verificationStatus: existingLead.verification_status,
         },
@@ -66,54 +74,65 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Check if authenticated user has confirmed email ───────────────────────
-    const serverClient = await createServerSupabaseClient();
-    const { data: { user: authUser } } = await serverClient.auth.getUser();
+    // ── Determine prize type mapped to DB enum ────────────────────────────────
+    // spin_leads.prize_type is free text (not an enum), coupons.discount_type must be 'percentage' | 'fixed'
+    const prizeType = discountType === 'shipping' ? 'free_shipping' : 'percentage';
+    const safeValue = prizeValue ?? 0;
 
-    let userId: string | null = null;
-    let emailConfirmed = false;
+    // ── Generate coupon ───────────────────────────────────────────────────────
+    const couponCode = generateCouponCode();
+    const expiryDays = couponExpirationDays > 0 ? couponExpirationDays : 7;
+    const expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000).toISOString();
 
-    if (authUser) {
-      // Authenticated user — check email_confirmed_at
-      userId = authUser.id;
-      emailConfirmed = authUser.email_confirmed_at != null;
+    // coupons.discount_type CHECK: 'percentage' | 'fixed'
+    // coupons.discount_value CHECK: > 0
+    const couponDiscountType = discountType === 'shipping' ? 'fixed' : 'percentage';
+    // For free shipping use a symbolic 1 unit value (discount_value must be > 0)
+    const couponDiscountValue = discountType === 'shipping' ? 1 : Math.max(safeValue, 1);
 
-      // Verify the email matches the authenticated user's email
-      if (authUser.email?.toLowerCase() !== normalizedEmail) {
-        // Different email from auth — treat as unverified anonymous spin
-        userId = null;
-        emailConfirmed = false;
-      }
-    } else {
-      // Anonymous user — check if this email exists in auth and is confirmed
-      // Using getUserByEmail for O(1) scalable lookup (no pagination limit)
-      const { data: userData, error: userLookupError } = await adminClient.auth.admin.getUserByEmail(normalizedEmail);
-      if (!userLookupError && userData?.user) {
-        userId = userData.user.id;
-        emailConfirmed = userData.user.email_confirmed_at != null;
-      }
+    const { data: couponData, error: couponError } = await adminClient
+      .from('coupons')
+      .insert({
+        code: couponCode,
+        description: `Ruleta — ${prizeLabel} — ${normalizedEmail}`,
+        discount_type: couponDiscountType,
+        discount_value: couponDiscountValue,
+        minimum_order_amount: minimumPurchase ?? 0,
+        maximum_discount: null,
+        usage_limit: 1,
+        per_user_limit: 1,
+        country_code: null,
+        is_active: true,
+        starts_at: new Date().toISOString(),
+        expires_at: expiresAt,
+      })
+      .select('id')
+      .single();
+
+    if (couponError) {
+      console.error('coupons insert error:', couponError);
+      return NextResponse.json({ error: 'Error al generar el cupón' }, { status: 500 });
     }
 
-    // ── Generate coupon code (always) ─────────────────────────────────────────
-    const couponCode = generateCouponCode();
-    const expiresAt = new Date(Date.now() + couponExpirationDays * 24 * 60 * 60 * 1000).toISOString();
-
     // ── Insert spin lead record ───────────────────────────────────────────────
-    const verificationStatus = emailConfirmed ? 'verified' : 'pending';
-
     const { error: leadError } = await adminClient.from('spin_leads').insert({
       email: normalizedEmail,
-      name: nombre?.trim() || null,
-      consent,
-      prize: prizeLabel,
-      coupon_code: emailConfirmed ? couponCode : null,
-      user_id: userId,
-      verification_status: verificationStatus,
-      verified_at: emailConfirmed ? new Date().toISOString() : null,
+      first_name: nombre?.trim() || null,
+      marketing_consent: consent,
+      prize_label: prizeLabel,
+      prize_type: prizeType,
+      prize_value: safeValue,
+      coupon_id: couponData.id,
+      coupon_code: couponCode,
+      ip_address: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? null,
+      user_agent: req.headers.get('user-agent') ?? null,
+      user_id: null,
+      verification_status: 'verified',
+      verified_at: new Date().toISOString(),
     });
 
     if (leadError) {
-      // Handle unique constraint violation (race condition)
+      // Unique constraint violation — race condition
       if (leadError.code === '23505') {
         return NextResponse.json(
           { error: 'already_spun', message: 'Este correo ya participó en la ruleta.' },
@@ -121,43 +140,12 @@ export async function POST(req: NextRequest) {
         );
       }
       console.error('spin_leads insert error:', leadError);
-      return NextResponse.json({ error: 'Error al registrar el giro' }, { status: 500 });
-    }
-
-    // ── If email is NOT confirmed: return pending state ───────────────────────
-    if (!emailConfirmed) {
+      // Coupon was created but lead failed — still return success with coupon
       return NextResponse.json({
-        status: 'pending_verification',
+        status: 'success',
         prize: prizeLabel,
-        message: 'Confirma tu correo del Crew para activar tu descuento 🎁',
-        email: normalizedEmail,
-      });
-    }
-
-    // ── Email IS confirmed: create the coupon ─────────────────────────────────
-    const couponPayload = {
-      code: couponCode,
-      description: `Ruleta de premios — ${prizeLabel} — ${normalizedEmail}`,
-      discount_type: discountType === 'shipping' ? 'shipping' : 'percentage',
-      discount_value: discountType === 'shipping' ? 0 : (prizeValue ?? 5),
-      minimum_order_amount: minimumPurchase,
-      maximum_discount: null,
-      usage_limit: 1,
-      per_user_limit: 1,
-      country_code: 'CO',
-      is_active: true,
-      starts_at: new Date().toISOString(),
-      expires_at: expiresAt,
-    };
-
-    const { error: couponError } = await adminClient.from('coupons').insert(couponPayload);
-
-    if (couponError) {
-      console.error('coupons insert error:', couponError);
-      return NextResponse.json({
-        status: 'coupon_error',
-        prize: prizeLabel,
-        message: 'Tu premio fue registrado, pero hubo un error al generar el cupón. Contáctanos.',
+        couponCode,
+        expiresAt,
       });
     }
 
@@ -168,7 +156,7 @@ export async function POST(req: NextRequest) {
       expiresAt,
     });
   } catch (err) {
-    console.error('spin API error:', err);
+    console.error('spin API unexpected error:', err);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
