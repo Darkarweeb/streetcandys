@@ -23,7 +23,7 @@ const testimonials = [
 {
   id: 3,
   productName: 'Tropical Punch Pre-Rolls',
-  productImage: "https://img.rocket.new/generatedImages/rocket_gen_img_118b43080-1785876653204.png",
+  productImage: "https://img.rocket.new/generatedImages/rocket_gen_img_123a4b574-1785340304634.png",
   productAlt: 'Small thumbnail of Tropical Punch Pre-Rolls product',
   quote: '"Top shelf quality every single time. I\'ve tried many brands but Street Candy\'s is on another level. The pre-rolls are perfectly crafted."',
   reviewer: 'SARAH K.',
