@@ -77,23 +77,9 @@ END;
 $$;
 
 -- 5. get_admin_product_detail
-CREATE OR REPLACE FUNCTION public.get_admin_product_detail(p_slug text)
-RETURNS json
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_result json;
-BEGIN
-  SELECT row_to_json(p.*) INTO v_result
-  FROM public.products p
-  WHERE p.slug = p_slug
-  LIMIT 1;
-  RETURN v_result;
-END;
-$$;
+-- SKIPPED: This function has a return type conflict in the existing DB.
+-- To fix it, run manually: DROP FUNCTION public.get_admin_product_detail(text);
+-- then re-apply. Excluded here to allow all other fixes to apply safely.
 
 -- 6. get_eligible_promotions
 CREATE OR REPLACE FUNCTION public.get_eligible_promotions(
@@ -521,7 +507,7 @@ $$;
 
 -- Revoke anon execute from internal/admin-only functions
 REVOKE EXECUTE ON FUNCTION public.cleanup_spin_otp_codes() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.get_admin_product_detail(text) FROM anon;
+-- get_admin_product_detail REVOKE skipped (return type conflict — see note above)
 REVOKE EXECUTE ON FUNCTION public.get_loyalty_summary(uuid) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.get_notification_summary(uuid) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon;
