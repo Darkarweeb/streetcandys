@@ -21,9 +21,9 @@ import { useEffect } from 'react';
  */
 
 const RELOAD_COUNT_KEY = '__sc_chunk_reload_count__';
-const MAX_RELOADS = 2;
+const MAX_RELOADS = 3;
 // How long (ms) the app must stay alive before we consider it "stable"
-const STABLE_DELAY_MS = 5000;
+const STABLE_DELAY_MS = 8000;
 
 function getReloadCount(): number {
   try {
@@ -43,6 +43,18 @@ function incrementReloadCount(): void {
 }
 
 function clearAllNextCaches() {
+  // Unregister service workers
+  try {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((reg) => reg.unregister());
+      });
+    }
+  } catch {
+    // ignore
+  }
+
+  // Clear Cache API
   try {
     if ('caches' in window) {
       caches.keys().then((keys) => {
@@ -53,6 +65,7 @@ function clearAllNextCaches() {
     // Cache API not available
   }
 
+  // Clear Next.js localStorage entries
   try {
     const ls = window.localStorage;
     const toRemove: string[] = [];
@@ -73,6 +86,7 @@ function clearAllNextCaches() {
     // localStorage not available
   }
 
+  // Clear Next.js sessionStorage entries (preserve reload counter)
   try {
     const ss = window.sessionStorage;
     const toRemove: string[] = [];
@@ -99,6 +113,7 @@ function isChunkError(msg: string): boolean {
   return (
     msg.includes("Cannot read properties of undefined (reading 'call')") ||
     msg.includes("undefined is not an object (evaluating 'originalFactory.call')") ||
+    msg.includes("undefined is not an object (evaluating 'originalFactory") ||
     msg.includes('Loading chunk') ||
     msg.includes('ChunkLoadError') ||
     msg.includes('originalFactory')
