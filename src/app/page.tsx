@@ -1595,7 +1595,7 @@ export default function HomePage() {
   return (
     <>
       {/* SEO meta — injected via head in layout, but we set title here */}
-      <div className="min-h-screen bg-sc-cream font-sans text-sc-forest overflow-x-hidden">
+      <div suppressHydrationWarning className="min-h-screen bg-sc-cream font-sans text-sc-forest overflow-x-hidden">
         <AnnouncementBar />
         <Navigation
           cartCount={cartCount}
@@ -1604,7 +1604,7 @@ export default function HomePage() {
           onCountryChange={handleCountryChange}
         />
 
-        <main id="main-content">
+        <main suppressHydrationWarning id="main-content">
           {/* 1. Hero */}
           <HeroSection country={country} onShopNow={scrollToFeatured} />
 
