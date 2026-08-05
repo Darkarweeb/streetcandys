@@ -18,7 +18,7 @@ import { useEffect } from 'react';
  */
 
 const RELOAD_COUNT_KEY = '__sc_chunk_reload_count__';
-const MAX_RELOADS = 3;
+const MAX_RELOADS = 2;
 
 function getReloadCount(): number {
   try {
@@ -114,7 +114,7 @@ function handleChunkError() {
 
 export default function ChunkErrorHandler() {
   useEffect(() => {
-    // Reset reload counter only after 10 s of stable operation.
+    // Reset reload counter only after 5 s of stable operation.
     // Resetting immediately on mount was the regression: the chunk error
     // fires ~100 ms after mount, the counter was already 0 again, and the
     // MAX_RELOADS guard never held — causing an infinite reload loop that
@@ -125,7 +125,7 @@ export default function ChunkErrorHandler() {
       } catch {
         // ignore
       }
-    }, 10000);
+    }, 5000);
 
     const handleError = (event: ErrorEvent) => {
       const msg = event?.message || '';
