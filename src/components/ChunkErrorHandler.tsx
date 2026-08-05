@@ -114,18 +114,12 @@ function handleChunkError() {
 
 export default function ChunkErrorHandler() {
   useEffect(() => {
-    // Reset reload counter only after 5 s of stable operation.
-    // Resetting immediately on mount was the regression: the chunk error
-    // fires ~100 ms after mount, the counter was already 0 again, and the
-    // MAX_RELOADS guard never held — causing an infinite reload loop that
-    // prevented SpinToWin (and the rest of the page) from ever rendering.
-    const resetTimer = setTimeout(() => {
-      try {
-        sessionStorage.removeItem(RELOAD_COUNT_KEY);
-      } catch {
-        // ignore
-      }
-    }, 5000);
+    // Reset reload counter on successful mount (app loaded fine)
+    try {
+      sessionStorage.removeItem(RELOAD_COUNT_KEY);
+    } catch {
+      // ignore
+    }
 
     const handleError = (event: ErrorEvent) => {
       const msg = event?.message || '';
@@ -147,7 +141,6 @@ export default function ChunkErrorHandler() {
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
     return () => {
-      clearTimeout(resetTimer);
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
