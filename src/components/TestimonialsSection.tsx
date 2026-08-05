@@ -14,7 +14,7 @@ const testimonials = [
 {
   id: 2,
   productName: 'Midnight Blueberry Drops',
-  productImage: "https://img.rocket.new/generatedImages/rocket_gen_img_1336e2ebc-1772460531497.png",
+  productImage: "https://img.rocket.new/generatedImages/rocket_gen_img_116106b26-1767800509499.png",
   productAlt: 'Small thumbnail of Midnight Blueberry Drops sleep gummies',
   quote: '"I finally sleep through the night! Street Candy\'s has completely changed my routine. The quality is unmatched and shipping was super fast."',
   reviewer: 'MARCUS T.',
@@ -32,7 +32,7 @@ const testimonials = [
 {
   id: 4,
   productName: 'Lemon Haze Flower',
-  productImage: "https://images.unsplash.com/photo-1612369300180-ed761b589b64",
+  productImage: "https://images.unsplash.com/photo-1594663787096-bb4ce20f6a86",
   productAlt: 'Small thumbnail of Lemon Haze Flower product',
   quote: '"The Lemon Haze is exactly what I needed for my creative sessions. Smooth, flavorful, and the effects are consistent every time."',
   reviewer: 'DAVID R.',
