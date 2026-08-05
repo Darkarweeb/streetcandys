@@ -110,13 +110,15 @@ function clearAllNextCaches() {
 }
 
 function isChunkError(msg: string): boolean {
+  const s = String(msg || '');
   return (
-    msg.includes("Cannot read properties of undefined (reading 'call')") ||
-    msg.includes("undefined is not an object (evaluating 'originalFactory.call')") ||
-    msg.includes("undefined is not an object (evaluating 'originalFactory") ||
-    msg.includes('Loading chunk') ||
-    msg.includes('ChunkLoadError') ||
-    msg.includes('originalFactory')
+    s.includes("Cannot read properties of undefined (reading 'call')") ||
+    s.includes("undefined is not an object (evaluating 'originalFactory.call')") ||
+    s.includes("undefined is not an object (evaluating 'originalFactory") ||
+    (s.includes('undefined is not an object') && s.includes('originalFactory')) ||
+    s.includes('Loading chunk') ||
+    s.includes('ChunkLoadError') ||
+    s.includes('originalFactory')
   );
 }
 
