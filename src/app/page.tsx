@@ -1,4 +1,4 @@
-// cache-bust-4
+// cache-bust-5
 'use client';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
@@ -1689,7 +1689,7 @@ export default function HomePage() {
   return (
     <>
       {/* SEO meta — injected via head in layout, but we set title here */}
-      <div className="min-h-screen bg-sc-cream font-sans text-sc-forest overflow-x-hidden">
+      <div suppressHydrationWarning className="min-h-screen bg-sc-cream font-sans text-sc-forest overflow-x-hidden">
         <AnnouncementBar />
         <Navigation
           cartCount={cartCount}
