@@ -1,6 +1,6 @@
 /**
  * Street Candy's — Welcome Email Template
- * "Bienvenido al Crew"
+ * "Bienvenido al Crew" — Premium Branded System
  */
 
 export interface WelcomeEmailData {
@@ -9,36 +9,110 @@ export interface WelcomeEmailData {
   verificationLink?: string;
 }
 
+// ─── Shared brand primitives ─────────────────────────────────────────────────
+
+const BRAND = {
+  black: '#0A0A0A',
+  fuchsia: '#E91E8C',
+  fuchsiaDark: '#C2185B',
+  green: '#4CAF50',
+  greenDark: '#388E3C',
+  white: '#FFFFFF',
+  offWhite: '#F9F9F9',
+  border: '#1E1E1E',
+  textMuted: '#888888',
+  textLight: '#AAAAAA',
+  siteUrl: 'https://streetcandys.shop',
+};
+
+// ─── Shared header block ─────────────────────────────────────────────────────
+
+function headerBlock(): string {
+  return `
+  <!-- ═══ HEADER ═══ -->
+  <tr>
+    <td style="background:${BRAND.black};padding:36px 40px 28px;text-align:center;border-bottom:3px solid ${BRAND.fuchsia};">
+      <!-- Logo SVG inline -->
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td align="center" style="padding-bottom:12px;">
+            <!-- Wordmark -->
+            <div style="display:inline-block;">
+              <span style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:900;color:${BRAND.white};letter-spacing:2px;text-transform:uppercase;">STREET</span>
+              <span style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:900;color:${BRAND.fuchsia};letter-spacing:2px;text-transform:uppercase;"> CANDY'S</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td align="center">
+            <span style="display:inline-block;background:${BRAND.fuchsia};color:${BRAND.white};font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:4px 14px;border-radius:20px;">PREMIUM HEMP &amp; CANNABIS</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>`;
+}
+
+// ─── Shared footer block ─────────────────────────────────────────────────────
+
+function footerBlock(): string {
+  return `
+  <!-- ═══ FOOTER ═══ -->
+  <tr>
+    <td style="background:${BRAND.black};padding:28px 40px;text-align:center;border-top:1px solid ${BRAND.border};">
+      <p style="margin:0 0 6px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:${BRAND.fuchsia};letter-spacing:1px;text-transform:uppercase;">Street Candy's</p>
+      <p style="margin:0 0 14px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;color:${BRAND.textLight};letter-spacing:0.5px;">Made for the Crew.</p>
+      <p style="margin:0 0 12px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;color:#555555;">
+        <a href="${BRAND.siteUrl}/privacidad" style="color:#666666;text-decoration:none;">Privacidad</a>
+        &nbsp;&nbsp;·&nbsp;&nbsp;
+        <a href="${BRAND.siteUrl}/terminos" style="color:#666666;text-decoration:none;">Términos</a>
+        &nbsp;&nbsp;·&nbsp;&nbsp;
+        <a href="${BRAND.siteUrl}/contacto" style="color:#666666;text-decoration:none;">Contacto</a>
+      </p>
+      <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;color:#444444;">© Street Candy's 2026</p>
+    </td>
+  </tr>`;
+}
+
+// ─── Welcome Email HTML ──────────────────────────────────────────────────────
+
 export function getWelcomeEmailHtml({ fullName, verificationLink }: WelcomeEmailData): string {
   const firstName = fullName?.split(' ')[0] || 'Amigo';
 
-  const verifySection = verificationLink
+  // ── Verification / Activation section ──────────────────────────────────────
+  const activationSection = verificationLink
     ? `
-              <!-- Verification Banner -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;border-radius:16px;overflow:hidden;border:2px solid #e91e8c;">
-                <tr>
-                  <td style="background:linear-gradient(135deg,#e91e8c 0%,#ff69b4 100%);padding:16px 24px;text-align:center;">
-                    <p style="margin:0;font-size:15px;font-weight:900;color:#ffffff;letter-spacing:-0.3px;">✉️ Verifica tu correo para activar tu cuenta</p>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="background:#fff8fb;padding:20px 24px;text-align:center;">
-                    <p style="margin:0 0 16px;font-size:13px;color:#555;line-height:1.6;">
-                      Tu cuenta en <strong style="color:#e91e8c;">Street Candy's</strong> no estará activa hasta que confirmes tu correo electrónico.
-                      Haz clic en el botón de abajo para verificar tu dirección y empezar a disfrutar todos los beneficios del crew.
-                    </p>
-                    <a href="${verificationLink}"
-                       style="display:inline-block;background:linear-gradient(135deg,#e91e8c 0%,#ff69b4 100%);color:#ffffff;font-size:16px;font-weight:900;text-decoration:none;padding:16px 40px;border-radius:50px;letter-spacing:0.3px;box-shadow:0 4px 16px rgba(233,30,140,0.35);">
-                      ✅ Verificar mi correo
-                    </a>
-                    <p style="margin:16px 0 0;font-size:11px;color:#aaa;line-height:1.6;">
-                      Este enlace expira en 24 horas. Si no creaste esta cuenta, ignora este correo.<br/>
-                      Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>
-                      <a href="${verificationLink}" style="color:#e91e8c;word-break:break-all;font-size:11px;">${verificationLink}</a>
-                    </p>
-                  </td>
-                </tr>
-              </table>
+      <!-- ═══ ACTIVATION BANNER ═══ -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;border-radius:12px;overflow:hidden;border:1.5px solid ${BRAND.fuchsia};">
+        <tr>
+          <td style="background:${BRAND.fuchsia};padding:14px 24px;text-align:center;">
+            <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:900;color:${BRAND.white};letter-spacing:1px;text-transform:uppercase;">Activa tu cuenta para acceder al crew</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#111111;padding:24px 28px;text-align:center;">
+            <p style="margin:0 0 20px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#CCCCCC;line-height:1.7;">
+              Un solo clic y ya eres parte oficial del crew.<br/>
+              Confirma tu correo para desbloquear todos los beneficios.
+            </p>
+            <!-- CTA Button -->
+            <a href="${verificationLink}"
+               style="display:inline-block;background:${BRAND.fuchsia};color:${BRAND.white};font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:900;text-decoration:none;padding:16px 44px;border-radius:6px;letter-spacing:2px;text-transform:uppercase;">
+              ACTIVAR MI CUENTA
+            </a>
+            <!-- Backup link -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;">
+              <tr>
+                <td style="border-top:1px solid #222222;padding-top:16px;text-align:center;">
+                  <p style="margin:0 0 6px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;color:#666666;letter-spacing:0.5px;">¿El botón no funciona? Usa este enlace:</p>
+                  <a href="${verificationLink}" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;color:${BRAND.fuchsia};text-decoration:underline;word-break:break-all;">Haz clic aquí para activar tu cuenta</a>
+                  <p style="margin:10px 0 0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10px;color:#555555;">Este enlace expira en 24 horas.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
     `
     : '';
 
@@ -49,134 +123,110 @@ export function getWelcomeEmailHtml({ fullName, verificationLink }: WelcomeEmail
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bienvenido al Crew — Street Candy's</title>
 </head>
-<body style="margin:0;padding:0;background:#fff0f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff0f5;padding:40px 16px;">
+<body style="margin:0;padding:0;background:#111111;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#111111;padding:40px 16px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:24px;overflow:hidden;border:1.5px solid #ffd6e8;">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#161616;border-radius:16px;overflow:hidden;border:1px solid #222222;">
 
-          <!-- Header -->
+          ${headerBlock()}
+
+          <!-- ═══ HERO GREETING ═══ -->
           <tr>
-            <td style="background:linear-gradient(135deg,#e91e8c 0%,#ff69b4 100%);padding:40px 32px;text-align:center;">
-              <div style="font-size:48px;margin-bottom:12px;">🍬</div>
-              <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:900;letter-spacing:-0.5px;">Bienvenido al Crew</h1>
-              <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">Street Candy's — Premium Hemp Wellness</p>
+            <td style="background:#161616;padding:40px 40px 8px;text-align:center;">
+              <p style="margin:0 0 6px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:28px;font-weight:900;color:${BRAND.white};letter-spacing:-0.5px;">Bienvenido al Crew,</p>
+              <p style="margin:0 0 16px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:28px;font-weight:900;color:${BRAND.fuchsia};letter-spacing:-0.5px;">${firstName}.</p>
+              <p style="margin:0 0 32px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;color:#AAAAAA;line-height:1.7;max-width:440px;margin-left:auto;margin-right:auto;">
+                Tu cuenta en <strong style="color:${BRAND.white};">Street Candy's</strong> ha sido creada.
+                Eres parte de nuestra comunidad de cultura callejera y bienestar premium con hemp y cannabis.
+              </p>
             </td>
           </tr>
 
-          <!-- Body -->
+          <!-- ═══ BODY ═══ -->
           <tr>
-            <td style="padding:32px;">
+            <td style="padding:0 40px 40px;">
 
-              <!-- Greeting -->
-              <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:#1a1a1a;">¡Hola, ${firstName}! 👋</p>
-              <p style="margin:0 0 24px;font-size:15px;color:#555;line-height:1.6;">
-                Tu cuenta en <strong style="color:#e91e8c;">Street Candy's</strong> ha sido creada exitosamente.
-                Ya eres parte de nuestro crew de bienestar premium con hemp y cannabis.
-              </p>
+              ${activationSection}
 
               <!-- Divider -->
-              <hr style="border:none;border-top:1.5px solid #ffd6e8;margin:0 0 24px;" />
-
-              ${verifySection}
-
-              <!-- Benefits -->
-              <p style="margin:0 0 16px;font-size:14px;font-weight:700;color:#1a1a1a;text-transform:uppercase;letter-spacing:0.5px;">Lo que te espera en el crew:</p>
-
-              <!-- Benefit 1 -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
                 <tr>
-                  <td width="48" style="vertical-align:top;">
-                    <div style="width:40px;height:40px;background:#fff0f5;border-radius:12px;text-align:center;line-height:40px;font-size:20px;">🏆</div>
+                  <td style="border-top:1px solid #222222;"></td>
+                </tr>
+              </table>
+
+              <!-- Benefits heading -->
+              <p style="margin:0 0 20px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;font-weight:700;color:${BRAND.fuchsia};letter-spacing:3px;text-transform:uppercase;">Lo que te espera en el crew</p>
+
+              <!-- Benefit 1 — Welcome Coupon -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;background:#1A1A1A;border-radius:10px;border:1px solid #252525;">
+                <tr>
+                  <td width="56" style="padding:16px 0 16px 20px;vertical-align:middle;">
+                    <div style="width:40px;height:40px;background:${BRAND.fuchsia};border-radius:8px;text-align:center;line-height:40px;font-size:20px;">🎟️</div>
                   </td>
-                  <td style="padding-left:12px;vertical-align:top;">
-                    <p style="margin:0;font-size:14px;font-weight:700;color:#1a1a1a;">Programa de Recompensas</p>
-                    <p style="margin:2px 0 0;font-size:13px;color:#888;">Acumula puntos en cada compra y canjéalos por descuentos exclusivos.</p>
+                  <td style="padding:16px 20px 16px 12px;vertical-align:middle;">
+                    <p style="margin:0 0 3px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;color:${BRAND.white};">Cupón de Bienvenida</p>
+                    <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#888888;line-height:1.5;">Descuento exclusivo en tu primera compra como miembro del crew.</p>
                   </td>
                 </tr>
               </table>
 
-              <!-- Benefit 2 -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+              <!-- Benefit 2 — Rewards Program -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;background:#1A1A1A;border-radius:10px;border:1px solid #252525;">
                 <tr>
-                  <td width="48" style="vertical-align:top;">
-                    <div style="width:40px;height:40px;background:#fff0f5;border-radius:12px;text-align:center;line-height:40px;font-size:20px;">🎁</div>
+                  <td width="56" style="padding:16px 0 16px 20px;vertical-align:middle;">
+                    <div style="width:40px;height:40px;background:${BRAND.green};border-radius:8px;text-align:center;line-height:40px;font-size:20px;">🏆</div>
                   </td>
-                  <td style="padding-left:12px;vertical-align:top;">
-                    <p style="margin:0;font-size:14px;font-weight:700;color:#1a1a1a;">Descuentos Exclusivos</p>
-                    <p style="margin:2px 0 0;font-size:13px;color:#888;">Ofertas especiales y promociones solo para miembros del crew.</p>
+                  <td style="padding:16px 20px 16px 12px;vertical-align:middle;">
+                    <p style="margin:0 0 3px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;color:${BRAND.white};">Programa de Recompensas</p>
+                    <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#888888;line-height:1.5;">Acumula puntos en cada compra y canjéalos por descuentos reales.</p>
                   </td>
                 </tr>
               </table>
 
-              <!-- Benefit 3 -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+              <!-- Benefit 3 — Exclusive Drops -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;background:#1A1A1A;border-radius:10px;border:1px solid #252525;">
                 <tr>
-                  <td width="48" style="vertical-align:top;">
-                    <div style="width:40px;height:40px;background:#fff0f5;border-radius:12px;text-align:center;line-height:40px;font-size:20px;">🌿</div>
+                  <td width="56" style="padding:16px 0 16px 20px;vertical-align:middle;">
+                    <div style="width:40px;height:40px;background:${BRAND.fuchsia};border-radius:8px;text-align:center;line-height:40px;font-size:20px;">🔥</div>
                   </td>
-                  <td style="padding-left:12px;vertical-align:top;">
-                    <p style="margin:0;font-size:14px;font-weight:700;color:#1a1a1a;">Contenido Educativo</p>
-                    <p style="margin:2px 0 0;font-size:13px;color:#888;">Guías, artículos y recursos sobre hemp, CBD y bienestar natural.</p>
+                  <td style="padding:16px 20px 16px 12px;vertical-align:middle;">
+                    <p style="margin:0 0 3px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;color:${BRAND.white};">Exclusive Drops</p>
+                    <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#888888;line-height:1.5;">Acceso anticipado a lanzamientos y ediciones limitadas del crew.</p>
                   </td>
                 </tr>
               </table>
 
-              <!-- Benefit 4 -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+              <!-- Benefit 4 — Hemp & Cannabis Deals -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;background:#1A1A1A;border-radius:10px;border:1px solid #252525;">
                 <tr>
-                  <td width="48" style="vertical-align:top;">
-                    <div style="width:40px;height:40px;background:#fff0f5;border-radius:12px;text-align:center;line-height:40px;font-size:20px;">🚀</div>
+                  <td width="56" style="padding:16px 0 16px 20px;vertical-align:middle;">
+                    <div style="width:40px;height:40px;background:${BRAND.green};border-radius:8px;text-align:center;line-height:40px;font-size:20px;">🌿</div>
                   </td>
-                  <td style="padding-left:12px;vertical-align:top;">
-                    <p style="margin:0;font-size:14px;font-weight:700;color:#1a1a1a;">Acceso Anticipado</p>
-                    <p style="margin:2px 0 0;font-size:13px;color:#888;">Sé el primero en conocer nuevos productos y lanzamientos especiales.</p>
+                  <td style="padding:16px 20px 16px 12px;vertical-align:middle;">
+                    <p style="margin:0 0 3px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;color:${BRAND.white};">Hemp &amp; Cannabis Deals</p>
+                    <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;color:#888888;line-height:1.5;">Ofertas exclusivas en productos premium de hemp y cannabis para el crew.</p>
                   </td>
                 </tr>
               </table>
 
-              <!-- CTA Button -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+              <!-- Explore CTA -->
+              <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
-                    <a href="https://streetcandys.shop/productos"
-                       style="display:inline-block;background:linear-gradient(135deg,#e91e8c 0%,#ff69b4 100%);color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:50px;letter-spacing:0.3px;">
-                      🍭 Explorar Productos
+                    <a href="${BRAND.siteUrl}/productos"
+                       style="display:inline-block;background:${BRAND.green};color:${BRAND.white};font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:6px;letter-spacing:2px;text-transform:uppercase;">
+                      EXPLORAR PRODUCTOS
                     </a>
                   </td>
                 </tr>
               </table>
 
-              <!-- Divider -->
-              <hr style="border:none;border-top:1.5px solid #ffd6e8;margin:0 0 20px;" />
-
-              <!-- Educational note -->
-              <p style="margin:0 0 8px;font-size:13px;color:#888;line-height:1.6;">
-                En Street Candy's creemos en el poder del hemp y el cannabis para el bienestar natural.
-                Todos nuestros productos son de calidad premium, con certificaciones de laboratorio y
-                elaborados con los más altos estándares.
-              </p>
-              <p style="margin:0;font-size:13px;color:#888;line-height:1.6;">
-                Visita nuestro <a href="https://streetcandys.shop/blog" style="color:#e91e8c;text-decoration:none;font-weight:600;">blog educativo</a>
-                para aprender más sobre los beneficios del hemp y el bienestar natural.
-              </p>
-
             </td>
           </tr>
 
-          <!-- Footer -->
-          <tr>
-            <td style="background:#fff8fb;padding:24px 32px;text-align:center;border-top:1.5px solid #ffd6e8;">
-              <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#e91e8c;">Street Candy's</p>
-              <p style="margin:0 0 12px;font-size:12px;color:#aaa;">Premium Hemp Wellness</p>
-              <p style="margin:0;font-size:11px;color:#ccc;line-height:1.6;">
-                Recibiste este correo porque creaste una cuenta en Street Candy's.<br/>
-                <a href="https://streetcandys.shop/privacidad" style="color:#e91e8c;text-decoration:none;">Política de privacidad</a>
-                &nbsp;·&nbsp;
-                <a href="https://streetcandys.shop/terminos" style="color:#e91e8c;text-decoration:none;">Términos y condiciones</a>
-              </p>
-            </td>
-          </tr>
+          ${footerBlock()}
 
         </table>
       </td>
@@ -186,24 +236,29 @@ export function getWelcomeEmailHtml({ fullName, verificationLink }: WelcomeEmail
 </html>`;
 }
 
+// ─── Welcome Email Plain Text ────────────────────────────────────────────────
+
 export function getWelcomeEmailText({ fullName, verificationLink }: WelcomeEmailData): string {
   const firstName = fullName?.split(' ')[0] || 'Amigo';
   const verifyBlock = verificationLink
-    ? `\n⚠️ IMPORTANTE: Debes verificar tu correo para activar tu cuenta.\nHaz clic aquí para verificar: ${verificationLink}\n(Este enlace expira en 24 horas)\n`
+    ? `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nACTIVAR MI CUENTA\n${verificationLink}\n(Este enlace expira en 24 horas)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
     : '';
 
-  return `¡Bienvenido al Crew, ${firstName}!
+  return `BIENVENIDO AL CREW, ${firstName.toUpperCase()}.
 
 Tu cuenta en Street Candy's ha sido creada exitosamente.
 ${verifyBlock}
-Lo que te espera:
-🏆 Programa de Recompensas — Acumula puntos en cada compra
-🎁 Descuentos Exclusivos — Ofertas solo para miembros del crew
-🌿 Contenido Educativo — Guías sobre hemp y bienestar
-🚀 Acceso Anticipado — Primero en conocer nuevos productos
+LO QUE TE ESPERA EN EL CREW:
 
-Explora nuestros productos: https://streetcandys.shop/productos
+🎟️  Cupón de Bienvenida — Descuento exclusivo en tu primera compra
+🏆  Programa de Recompensas — Acumula puntos en cada compra
+🔥  Exclusive Drops — Acceso anticipado a lanzamientos limitados
+🌿  Hemp & Cannabis Deals — Ofertas premium solo para el crew
 
-Street Candy's — Premium Hemp Wellness
-https://streetcandys.shop`;
+Explora nuestros productos:
+${BRAND.siteUrl}/productos
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+© Street Candy's 2026 — Made for the Crew.
+${BRAND.siteUrl}`;
 }
