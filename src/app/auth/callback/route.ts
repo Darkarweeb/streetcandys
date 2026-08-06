@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   // ── Path A (recovery): token_hash + type=recovery ────────────────────────
   if (type === 'recovery') {
-    const recoveryToken = searchParams.get('token') ?? searchParams.get('token_hash');
+    const recoveryToken = searchParams.get('token_hash') ?? searchParams.get('token');
 
     if (recoveryToken) {
       const supabase = await createClient();
@@ -54,17 +54,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
   }
 
-  // ── Path C: PKCE authorization code flow (OAuth, magic link, recovery) ───
+  // ── Path C: PKCE authorization code flow (OAuth, magic link) ─────────────
   if (code) {
     const supabase = await createClient();
     const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!exchangeError && exchangeData?.session) {
-      // Detect recovery session via AMR (Authentication Methods Reference)
-      const amr = (exchangeData.session as any).amr as Array<{ method: string }> | undefined;
-      const isRecovery = Array.isArray(amr) && amr.some((a) => a.method === 'otp');
-      const destination = isRecovery ? '/nueva-contrasena' : next;
-      return NextResponse.redirect(`${origin}${destination}`);
+      return NextResponse.redirect(`${origin}${next}`);
     }
 
     return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
