@@ -1,0 +1,24 @@
+-- ============================================================
+-- Fix: Grant EXECUTE on is_admin() to anon role
+-- Migration: 20260805200000_fix_is_admin_anon_grant.sql
+--
+-- ROOT CAUSE:
+--   Migration 20260805100000_rollback_security_warning_changes.sql
+--   revoked EXECUTE on public.is_admin() from the anon role.
+--   However, RLS policies on blog_posts (and other public-read tables)
+--   call is_admin() in their USING clauses. When an anonymous user
+--   (or any request without an active session) queries these tables,
+--   PostgreSQL evaluates the RLS policy as the anon role, which no
+--   longer has EXECUTE permission on is_admin(), resulting in:
+--     "permission denied for function is_admin"
+--
+-- FIX:
+--   Re-grant EXECUTE on is_admin() to the anon role.
+--   This is safe: is_admin() is a SECURITY DEFINER read-only function
+--   that queries auth.users metadata. For anon users, auth.uid() returns
+--   NULL, so is_admin() always returns FALSE — correct behavior.
+--
+-- SCOPE: Single GRANT statement. No schema objects modified.
+-- ============================================================
+
+GRANT EXECUTE ON FUNCTION public.is_admin() TO anon;

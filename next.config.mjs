@@ -138,13 +138,6 @@ const nextConfig = {
     }
 
     if (dev) {
-      config.module.rules.push({
-        test: /\.(jsx|tsx)$/,
-        exclude: [/node_modules/],
-        use: [{
-          loader: '@dhiwise/component-tagger/nextLoader',
-        }],
-      });
       const ignoredPaths = (process.env.WATCH_IGNORED_PATHS || '')
         .split(',')
         .map((p) => p.trim())
@@ -191,6 +184,16 @@ const nextConfig = {
       // Drop capacitor.config from all webpack graphs
       [path.resolve(__dirname, './capacitor.config.ts')]: false,
     };
+
+    if (dev) {
+      config.module.rules.push({
+        test: /\.(jsx|tsx)$/,
+        exclude: [/node_modules/],
+        use: [{
+          loader: '@dhiwise/component-tagger/nextLoader',
+        }],
+      });
+    }
 
     return config;
   },

@@ -73,7 +73,7 @@ The `WATCH_IGNORED_PATHS` environment variable is also Rocket-specific and can b
 
 | Variable | Current Value | Action |
 |----------|--------------|--------|
-| `NEXT_PUBLIC_SITE_URL` | `https://streetcand8616.builtwithrocket.new` | **Must update** to `https://streetcandys.shop` |
+| `NEXT_PUBLIC_SITE_URL` | `https://streetcandys.shop` ✅ Already updated | No action needed — already set to production URL |
 | `WATCH_IGNORED_PATHS` | Set by Rocket internally | Remove entirely |
 
 ### 1.5 Platform-Specific Behavior
@@ -185,7 +185,7 @@ All environment variables must be transferred to the new hosting platform. See t
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Public | Stripe publishable key |
 | `STRIPE_SECRET_KEY` | **Secret** | Stripe secret key — never expose publicly |
 | `STRIPE_WEBHOOK_SECRET` | **Secret** | Stripe webhook signing secret |
-| `NEXT_PUBLIC_SITE_URL` | Public | **Must change** from Rocket URL to `https://streetcandys.shop` |
+| `NEXT_PUBLIC_SITE_URL` | Public | **Already set** to `https://streetcandys.shop` — verify this value is carried over to the new host |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Public | Google Analytics measurement ID |
 | `NEXT_PUBLIC_ADSENSE_ID` | Public | Google AdSense ID |
 | `OPENAI_API_KEY` | **Secret** | OpenAI API key (if used) |

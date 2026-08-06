@@ -147,6 +147,16 @@ const navItems = [
     ),
   },
   {
+    label: 'Partners',
+    href: '/admin/partners',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <circle cx="6" cy="9" r="3.5" stroke="currentColor" strokeWidth="1.5"/>
+        <circle cx="12" cy="9" r="3.5" stroke="currentColor" strokeWidth="1.5"/>
+      </svg>
+    ),
+  },
+  {
     label: 'Configuración',
     href: '/admin/configuracion',
     icon: (

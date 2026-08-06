@@ -86,24 +86,17 @@ export default function RegistroPage() {
     }
 
     setLoading(true);
+
     try {
       await signUp({ email, password, fullName, countryCode });
       setSuccess(true);
-
-      // Fire-and-forget welcome email — registration success is never blocked by this
-      fetch('/api/email/welcome', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, fullName }),
-      }).catch((err) => {
-        console.warn('[registro] Welcome email request failed (non-fatal):', err);
-      });
+      // Welcome + verification email is sent server-side inside /api/auth/signup
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al crear la cuenta.';
       if (msg.includes('already registered') || msg.includes('already exists')) {
         setError('Este correo ya está registrado. ¿Quieres iniciar sesión?');
       } else {
-        setError(msg);
+        setError(msg || 'Error al crear la cuenta.');
       }
     } finally {
       setLoading(false);
@@ -138,6 +131,9 @@ export default function RegistroPage() {
         <Link href="/" className="mb-8 relative z-10">
           <AppLogo variant="light" height={52} />
         </Link>
+
+        {/* ─── TEMPORARY DEBUG PANEL (success screen) ─────────────────────── */}
+        {/* ─────────────────────────────────────────────────────────────────── */}
 
         <div className="w-full max-w-md relative z-10">
           <div className="bg-white rounded-3xl shadow-xl overflow-hidden" style={{ border: '1.5px solid #ffd6e8' }}>
@@ -238,6 +234,9 @@ export default function RegistroPage() {
       {/* Decorative circles */}
       <div className="fixed top-0 right-0 w-80 h-80 rounded-full pointer-events-none opacity-30" style={{ background: 'radial-gradient(circle, #ff69b4 0%, transparent 70%)', transform: 'translate(40%, -40%)' }} aria-hidden="true" />
       <div className="fixed bottom-0 left-0 w-64 h-64 rounded-full pointer-events-none opacity-20" style={{ background: 'radial-gradient(circle, #e91e8c 0%, transparent 70%)', transform: 'translate(-40%, 40%)' }} aria-hidden="true" />
+
+      {/* ─── TEMPORARY DEBUG PANEL (form screen) ────────────────────────────── */}
+      {/* ───────────────────────────────────────────────────────────────────── */}
 
       {/* Logo */}
       <Link href="/" className="mb-8 relative z-10">
@@ -464,6 +463,11 @@ export default function RegistroPage() {
           <Link href="/iniciar-sesion" className="font-bold hover:underline" style={{ color: '#e91e8c' }}>
             Iniciar sesión
           </Link>
+        </p>
+
+        {/* Footer */}
+        <p className="text-center text-xs mt-4" style={{ color: '#aaa' }}>
+          © 2026 Street Candy&apos;s. Todos los derechos reservados.
         </p>
       </div>
     </div>

@@ -50,7 +50,7 @@ export async function GET() {
 
     // 3. Send a password reset email so the admin can set a new known password
     const { error: resetError } = await adminClient.auth.resetPasswordForEmail(targetEmail, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/nueva-contrasena`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
     });
 
     if (resetError) {

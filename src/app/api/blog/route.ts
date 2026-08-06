@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,9 +15,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = await createClient();
+    const adminClient = createAdminClient();
 
     // Auto-publish any scheduled posts whose time has come
-    await supabase.rpc('publish_scheduled_posts').then(() => {});
+    // Use admin client to avoid permission denied for is_admin() when called from anon context
+    await adminClient.rpc('publish_scheduled_posts').then(() => {});
 
     let query = supabase
       .from('blog_posts')

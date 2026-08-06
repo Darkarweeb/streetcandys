@@ -150,39 +150,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw new Error('Street Candy solo está disponible en Colombia y Costa Rica.');
     }
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          country_code: countryCode,
-          role: 'customer',
-        },
-        emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback`,
-      },
+    // User creation is handled server-side via the Admin API so that Supabase
+    // never attempts its own email delivery (which caused HTTP 500
+    // "Error sending confirmation email"). The server route:
+    //   1. Creates the user with email_confirm: false
+    //   2. Generates a confirmation link via generateLink
+    //   3. Sends the welcome + confirmation email via Resend
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, fullName, countryCode }),
     });
 
-    if (error) throw error;
-
-    // If profile wasn't auto-created by trigger, create it manually
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: data.user.id,
-          email,
-          full_name: fullName,
-          country_code: countryCode,
-          role: 'customer',
-          age_verified: false,
-          is_active: true,
-        }, { onConflict: 'id' });
-
-      // Non-fatal: trigger may have already created it
-      if (profileError && profileError.code !== '23505') {
-        console.warn('Perfil no pudo crearse automáticamente:', profileError.message);
-      }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error || 'Error al crear la cuenta.');
     }
   };
 
@@ -206,10 +188,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback?next=/nueva-contrasena`,
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     });
-    if (error) throw error;
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error || 'No se pudo enviar el correo de recuperación.');
+    }
   };
 
   const updatePassword = async (newPassword: string) => {

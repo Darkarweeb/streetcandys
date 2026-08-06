@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import type { EmailOtpType } from '@supabase/supabase-js';
 
 // Allowed redirect paths — must start with / and not contain protocol or double-slash
 function isSafeRedirectPath(path: string): boolean {
@@ -13,30 +14,62 @@ function isSafeRedirectPath(path: string): boolean {
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
-  const nextParam = searchParams.get('next') ?? '/cuenta';
 
-  // Validate the redirect target to prevent open redirect attacks
+  const code = searchParams.get('code');
+  const type = searchParams.get('type') as EmailOtpType | null;
+  const nextParam = searchParams.get('next') ?? '/cuenta';
   const next = isSafeRedirectPath(nextParam) ? nextParam : '/cuenta';
 
-  if (code) {
+  // ── Path A (recovery): token_hash + type=recovery ────────────────────────
+  if (type === 'recovery') {
+    const recoveryToken = searchParams.get('token_hash') ?? searchParams.get('token');
+
+    if (recoveryToken) {
+      const supabase = await createClient();
+      const { data, error } = await supabase.auth.verifyOtp({
+        token_hash: recoveryToken,
+        type: 'recovery',
+      });
+
+      if (!error && data?.session) {
+        return NextResponse.redirect(`${origin}/nueva-contrasena`);
+      }
+
+      return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
+    }
+
+    return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
+  }
+
+  // ── Path B: token_hash flow (signup or other OTP types) ──────────────────
+  const tokenHash = searchParams.get('token_hash') ?? searchParams.get('token');
+  if (tokenHash && type) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
 
     if (!error) {
-      // If the callback is for email verification (next points to /email-verificado),
-      // redirect there so the user sees the success page.
-      // For all other flows (password reset, etc.) redirect to the requested path.
+      return NextResponse.redirect(`${origin}/cuenta`);
+    }
+
+    return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
+  }
+
+  // ── Path C: PKCE authorization code flow (OAuth, magic link) ─────────────
+  if (code) {
+    const supabase = await createClient();
+    const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (!exchangeError && exchangeData?.session) {
       return NextResponse.redirect(`${origin}${next}`);
     }
 
-    // Token exchange failed — could be expired or already used
-    if (next === '/email-verificado') {
-      // Email verification link was invalid/expired — show friendly error page
-      return NextResponse.redirect(`${origin}/verificar-email?error=enlace-invalido`);
-    }
+    return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
   }
 
-  // On error, redirect to login with error param
-  return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
+  // ── Path D: Implicit flow — forward to client-side handler ───────────────
+  const clientUrl = new URL(`${origin}/auth/confirmar`);
+  if (nextParam && isSafeRedirectPath(nextParam)) {
+    clientUrl.searchParams.set('next', nextParam);
+  }
+  return NextResponse.redirect(clientUrl.toString());
 }

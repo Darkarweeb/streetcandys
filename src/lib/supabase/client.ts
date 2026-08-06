@@ -1,25 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-const PFX = 'sb_';
-
-const canUseCookies = (() => {
-  let cache: boolean | null = null;
-  return () => {
-    if (typeof document === 'undefined') return false;
-    if (cache !== null) return cache;
-    // Use a simple SameSite=Lax test — no Partitioned attribute which can fail in iframes
-    const k = '__sb_test__';
-    try {
-      document.cookie = `${k}=1; Path=/; SameSite=Lax`;
-      cache = document.cookie.includes(k);
-      document.cookie = `${k}=; Path=/; Max-Age=0; SameSite=Lax`;
-    } catch {
-      cache = false;
-    }
-    return cache;
-  };
-})();
-
 const fromCookies = () =>
   typeof document === 'undefined'
     ? []
@@ -35,18 +15,8 @@ const fromCookies = () =>
         })
         .filter((c) => c.name);
 
-const fromStorage = () => {
-  try {
-    return Object.keys(localStorage)
-      .filter((k) => k.startsWith(PFX))
-      .map((k) => ({ name: k.slice(PFX.length), value: localStorage.getItem(k) || '' }));
-  } catch {
-    return [];
-  }
-};
-
 const setCookie = (name: string, value: string, options?: Record<string, unknown>) => {
-  // Use SameSite=Lax for broad compatibility; avoid Partitioned which breaks in iframes
+  // SameSite=Lax for broad compatibility; always use real cookies so SSR can read them
   let s = `${name}=${encodeURIComponent(value)}; Path=${options?.path || '/'}; SameSite=Lax`;
   if (options?.maxAge) s += `; Max-Age=${options.maxAge}`;
   if (options?.domain) s += `; Domain=${options.domain}`;
@@ -71,9 +41,7 @@ const deleteCookie = (name: string) => {
 };
 
 const getToken = () =>
-  (canUseCookies() ? fromCookies() : fromStorage()).find((c) =>
-    c.name.includes('auth-token'),
-  )?.value ?? null;
+  fromCookies().find((c) => c.name.includes('auth-token'))?.value ?? null;
 
 export function createClient() {
   // Patch fetch once per browser session, inside the function to avoid SSR/module-init issues
@@ -100,25 +68,17 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => (canUseCookies() ? fromCookies() : fromStorage()),
+        // Always read from document.cookie — server reads HTTP cookies, must match
+        getAll: () => fromCookies(),
         setAll(cookiesToSet) {
           if (typeof document === 'undefined') return;
-          if (canUseCookies()) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              value
-                ? setCookie(name, value, options as Record<string, unknown>)
-                : deleteCookie(name),
-            );
-          } else {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              try {
-                value
-                  ? localStorage.setItem(`${PFX}${name}`, value)
-                  : localStorage.removeItem(`${PFX}${name}`);
-              } catch {}
-              if (value) setCookie(name, value, options as Record<string, unknown>);
-            });
-          }
+          // Always write to real HTTP cookies — never localStorage
+          // This ensures the PKCE verifier is accessible to exchangeCodeForSession on the server
+          cookiesToSet.forEach(({ name, value, options }) =>
+            value
+              ? setCookie(name, value, options as Record<string, unknown>)
+              : deleteCookie(name),
+          );
         },
       },
     },
