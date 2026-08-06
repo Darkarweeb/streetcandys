@@ -13,22 +13,8 @@ function isSafeRedirectPath(path: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  // ── [TEMP DIAGNOSTIC] Redirect immediately — no exchangeCodeForSession ───
   const { searchParams, origin } = new URL(request.url);
-  const allCookies = request.cookies.getAll();
-  const cookieNames = allCookies.map((c) => c.name);
 
-  const debugParams = new URLSearchParams({
-    has_code:  String(searchParams.has('code')),
-    has_token: String(searchParams.has('token') || searchParams.has('token_hash')),
-    has_type:  String(searchParams.has('type')),
-    cookie_names: cookieNames.join(','),
-  });
-
-  return NextResponse.redirect(`${origin}/auth/pkce-debug?${debugParams.toString()}`);
-  // ── [END TEMP DIAGNOSTIC] ────────────────────────────────────────────────
-
-  // eslint-disable-next-line no-unreachable
   const code = searchParams.get('code');
   const type = searchParams.get('type') as EmailOtpType | null;
   const nextParam = searchParams.get('next') ?? '/cuenta';
@@ -70,36 +56,18 @@ export async function GET(request: NextRequest) {
 
   // ── Path C: PKCE authorization code flow (OAuth, magic link, recovery) ───
   if (code) {
-    // [TEMP PKCE DEBUG] Inspect incoming cookie names — no values
-    const allCookies = request.cookies.getAll();
-    const cookieNames = allCookies.map((c) => c.name);
-    const pkceArrived = cookieNames.some(
-      (n) => n.includes('code-verifier') || n.includes('pkce') || n.includes('auth-code'),
-    );
-
     const supabase = await createClient();
     const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-
-    // [TEMP PKCE DEBUG] Build debug redirect params
-    const debugParams = new URLSearchParams({
-      pkce_arrived: String(pkceArrived),
-      cookie_names: cookieNames.join(','),
-    });
 
     if (!exchangeError && exchangeData?.session) {
       // Detect recovery session via AMR (Authentication Methods Reference)
       const amr = (exchangeData.session as any).amr as Array<{ method: string }> | undefined;
       const isRecovery = Array.isArray(amr) && amr.some((a) => a.method === 'otp');
-      const destination = isRecovery ? '/nueva-contrasena' : `${next}`;
-      debugParams.set('dest', destination);
-      return NextResponse.redirect(`${origin}/auth/pkce-debug?${debugParams.toString()}`);
+      const destination = isRecovery ? '/nueva-contrasena' : next;
+      return NextResponse.redirect(`${origin}${destination}`);
     }
 
-    debugParams.set('dest', '/iniciar-sesion?error=enlace-invalido');
-    if (exchangeError) {
-      debugParams.set('exchange_error', encodeURIComponent(exchangeError.message));
-    }
-    return NextResponse.redirect(`${origin}/auth/pkce-debug?${debugParams.toString()}`);
+    return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
   }
 
   // ── Path D: Implicit flow — forward to client-side handler ───────────────
