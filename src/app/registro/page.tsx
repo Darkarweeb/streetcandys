@@ -464,6 +464,11 @@ export default function RegistroPage() {
             Iniciar sesión
           </Link>
         </p>
+
+        {/* Footer */}
+        <p className="text-center text-xs mt-4" style={{ color: '#aaa' }}>
+          © 2026 Street Candy&apos;s. Todos los derechos reservados.
+        </p>
       </div>
     </div>
   );
