@@ -13,8 +13,22 @@ function isSafeRedirectPath(path: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
+  // ── [TEMP DIAGNOSTIC] Redirect immediately — no exchangeCodeForSession ───
   const { searchParams, origin } = new URL(request.url);
+  const allCookies = request.cookies.getAll();
+  const cookieNames = allCookies.map((c) => c.name);
 
+  const debugParams = new URLSearchParams({
+    has_code:  String(searchParams.has('code')),
+    has_token: String(searchParams.has('token') || searchParams.has('token_hash')),
+    has_type:  String(searchParams.has('type')),
+    cookie_names: cookieNames.join(','),
+  });
+
+  return NextResponse.redirect(`${origin}/auth/pkce-debug?${debugParams.toString()}`);
+  // ── [END TEMP DIAGNOSTIC] ────────────────────────────────────────────────
+
+  // eslint-disable-next-line no-unreachable
   const code = searchParams.get('code');
   const type = searchParams.get('type') as EmailOtpType | null;
   const nextParam = searchParams.get('next') ?? '/cuenta';
