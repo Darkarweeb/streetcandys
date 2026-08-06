@@ -142,20 +142,16 @@ They are **never** included in the client bundle.
 
 ### 5.3 Email Variables — Important Notes
 
-The email system uses **Resend** (`src/lib/email/client.ts`). Two variables control email delivery:
+The email system uses **Resend** (`src/lib/email/client.ts`). All authentication emails are sent via the Supabase Admin API `generateLink` method — Supabase's built-in email delivery is bypassed entirely.
 
-| Item | Current Value | Action Required |
+| Item | Current Value | Status |
 |---|---|---|
-| `RESEND_API_KEY` | Placeholder in `.env` | **Must be replaced** with a real Resend API key |
-| `FROM_EMAIL` (hardcoded) | `onboarding@resend.dev` | **Must be updated** in `src/lib/email/client.ts` to a verified custom domain address (e.g. `noreply@streetcandys.shop`) before production |
+| `RESEND_API_KEY` | Real value set | ✅ Configured — must remain set |
+| `FROM_EMAIL` (hardcoded) | `CREW@streetcandys.shop` | ✅ Already configured — no code change needed |
 
-> ⚠️ **Critical**: Until `RESEND_API_KEY` is set to a real value, **no transactional emails
-> will be delivered** — welcome emails, order confirmations, and rewards notifications all
-> fail silently. The application continues to function but customers receive no emails.
+> ⚠️ **Critical**: `RESEND_API_KEY` must remain set to a real value. Without it, **no transactional emails will be delivered** — welcome/verification emails and password recovery emails all fail silently.
 
-> ⚠️ **Sandbox restriction**: The `onboarding@resend.dev` sender address only delivers to
-> the Resend account owner's email in sandbox mode. For production, you must verify a custom
-> domain in the Resend Dashboard and update `FROM_EMAIL` in `src/lib/email/client.ts`.
+> ⚠️ **Domain verification**: The `streetcandys.shop` sender domain must be verified in the Resend Dashboard → Domains. If the domain is not verified, emails will be rejected or bounced.
 
 ### 5.4 Build-time Variables (optional)
 

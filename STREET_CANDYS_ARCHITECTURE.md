@@ -589,13 +589,27 @@ Every table has Row Level Security enabled. The strategy follows these patterns:
 
 **Supabase Auth** with email/password only. No OAuth providers (Google, GitHub, etc.) are configured.
 
+### Authentication UI
+
+All authentication pages share a **unified visual system** using `/iniciar-sesion` as the single source of truth:
+
+- Pink gradient background with decorative circles
+- White `rounded-3xl` card with `#ffd6e8` border and shadow
+- `AppLogo` branding centered at the top
+- `#fff0f5` input backgrounds with pink focus rings
+- Pink gradient submit button with loading spinner
+- Pink-themed error and success message styles
+- `© 2026 Street Candy's. Todos los derechos reservados.` footer on all auth pages
+
+**Auth pages:** `/iniciar-sesion`, `/registro`, `/recuperar-contrasena`, `/nueva-contrasena`, `/email-verificado`
+
 ### Registration Flow
 
 1. User submits registration form at `/registro` with: email, password, full_name, country_code (CO or CR)
 2. Country validation: only `CO` and `CR` are accepted — throws error otherwise
-3. `supabase.auth.signUp()` is called with `user_metadata`: `{ full_name, country_code, role: 'customer' }`
-4. `emailRedirectTo` is set to `{origin}/auth/callback`
-5. Supabase sends a confirmation email to the user
+3. Form calls `POST /api/auth/signup` (server-side Admin API route — bypasses Supabase's own email delivery)
+4. API route calls `adminClient.auth.admin.generateLink({ type: 'signup', email, password, options: { data: { full_name, country_code, role: 'customer' } } })`
+5. API route sends the verification link via **Resend** using the branded Welcome email template (`src/lib/email/templates/welcome.ts`)
 6. **Trigger path:** `on_auth_user_created` trigger fires `handle_new_user()` which auto-creates the `profiles` row
 7. **Fallback path:** If the trigger fails, the client-side code performs an upsert on `profiles` directly
 8. User must confirm their email before they can log in
@@ -611,13 +625,34 @@ Every table has Row Level Security enabled. The strategy follows these patterns:
 
 ### Password Recovery Flow
 
+> **Architecture note:** Password recovery uses a fully **server-side** flow via the Supabase Admin API + Resend. It does **not** use `supabase.auth.resetPasswordForEmail()` or PKCE code exchange, which avoids PKCE-related redirect failures in sandboxed/iframe environments.
+
 1. User submits email at `/recuperar-contrasena`
-2. `supabase.auth.resetPasswordForEmail()` is called with `redirectTo: {origin}/auth/callback?next=/nueva-contrasena`
-3. User receives email with magic link
-4. Link opens `/auth/callback?code=...&next=/nueva-contrasena`
-5. `auth/callback/route.ts` exchanges the code for a session via `supabase.auth.exchangeCodeForSession()`
-6. User is redirected to `/nueva-contrasena`
-7. User submits new password → `supabase.auth.updateUser({ password: newPassword })`
+2. Form calls `POST /api/auth/reset-password`
+3. API route calls `adminClient.auth.admin.generateLink({ type: 'recovery', email, options: { redirectTo: 'https://streetcandys.shop/nueva-contrasena' } })`
+4. API route sends the recovery link via **Resend** using the branded password recovery email template (inline in `src/app/api/auth/reset-password/route.ts`)
+5. User clicks the `RESTABLECER CONTRASEÑA` CTA in the email
+6. Link opens `/nueva-contrasena` with a `token_hash` query parameter
+7. `/nueva-contrasena` calls `supabase.auth.verifyOtp({ token_hash, type: 'recovery' })` to establish a session
+8. User submits new password → `supabase.auth.updateUser({ password: newPassword })`
+9. On success: 3-second countdown then redirect to `/iniciar-sesion`
+
+### Email Templates
+
+All transactional authentication emails are **branded premium templates** sent via Resend. Supabase's built-in email delivery is bypassed entirely.
+
+| Email | Trigger | Template Location | CTA |
+|---|---|---|---|
+| Welcome + Email Verification | New user registration | `src/lib/email/templates/welcome.ts` | `ACTIVAR MI CUENTA` |
+| Password Recovery | Password reset request | `src/app/api/auth/reset-password/route.ts` (inline) | `RESTABLECER CONTRASEÑA` |
+
+**Template design system:**
+- Black `#0A0A0A` header with STREET CANDY'S wordmark + fuchsia pill badge
+- Fuchsia (`#FF006E`) and green (`#00C853`) accent colors
+- Branded CTAs (no generic Supabase-style wording)
+- Clean backup link section (no raw URLs displayed)
+- Footer: `© Street Candy's 2026 — Made for the Crew.`
+- Sender: `CREW@streetcandys.shop` (verified custom domain)
 
 ### Session Handling
 

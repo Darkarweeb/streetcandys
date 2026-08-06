@@ -245,7 +245,8 @@ The application uses **Resend** for all transactional emails. Three types of ema
 
 | Email Type | Trigger | Template File |
 |---|---|---|
-| Welcome email | New user registration | `src/lib/email/templates/welcome.ts` |
+| Welcome + Email Verification | New user registration | `src/lib/email/templates/welcome.ts` |
+| Password Recovery | Password reset request | `src/app/api/auth/reset-password/route.ts` (inline) |
 | Order confirmation | Order created via checkout | `src/lib/email/templates/order.ts` |
 | Order status updates | Order status changes (processing, shipped, delivered) | `src/lib/email/templates/order.ts` |
 | Rewards notification | Points earned after delivery | `src/lib/email/templates/rewards.ts` |
@@ -258,17 +259,9 @@ The application uses **Resend** for all transactional emails. Three types of ema
    - Wait for domain verification (usually 5–30 minutes)
 3. **Generate an API key** in Resend Dashboard → API Keys
 4. **Set `RESEND_API_KEY`** in your deployment platform environment variables
-5. **Update `FROM_EMAIL`** in `src/lib/email/client.ts`:
-   ```typescript
-   // Change from:
-   export const FROM_EMAIL = 'Street Candy\'s <onboarding@resend.dev>';
-   // To:
-   export const FROM_EMAIL = 'Street Candy\'s <noreply@streetcandys.shop>';
-   ```
+5. **`FROM_EMAIL` is already configured** in `src/lib/email/client.ts` as `CREW@streetcandys.shop` — no code change needed. Ensure `streetcandys.shop` is verified as a sender domain in the Resend dashboard.
 
-> ⚠️ **Important**: The `onboarding@resend.dev` sender address is a Resend sandbox address.
-> In sandbox mode, emails are only delivered to the Resend account owner's email.
-> All other recipients will not receive emails until a verified custom domain is configured.
+> ⚠️ **Important**: All authentication emails (welcome/verification, password recovery) are sent via Resend using the Admin API `generateLink` method. Supabase's built-in email delivery is bypassed entirely. The `RESEND_API_KEY` must be set and the `streetcandys.shop` domain must be verified in Resend for any email to be delivered.
 
 ---
 
