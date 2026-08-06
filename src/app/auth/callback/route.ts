@@ -56,26 +56,36 @@ export async function GET(request: NextRequest) {
 
   // ── Path C: PKCE authorization code flow (OAuth, magic link, recovery) ───
   if (code) {
-    // [TEMP INSPECTION] List incoming request cookie names — no values logged
-    const incomingCookieNames = request.cookies.getAll().map((c) => c.name);
-    console.log('[PKCE-INSPECT] Cookie names received at /auth/callback:', incomingCookieNames);
+    // [TEMP PKCE DEBUG] Inspect incoming cookie names — no values
+    const allCookies = request.cookies.getAll();
+    const cookieNames = allCookies.map((c) => c.name);
+    const pkceArrived = cookieNames.some(
+      (n) => n.includes('code-verifier') || n.includes('pkce') || n.includes('auth-code'),
+    );
 
     const supabase = await createClient();
     const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+    // [TEMP PKCE DEBUG] Build debug redirect params
+    const debugParams = new URLSearchParams({
+      pkce_arrived: String(pkceArrived),
+      cookie_names: cookieNames.join(','),
+    });
 
     if (!exchangeError && exchangeData?.session) {
       // Detect recovery session via AMR (Authentication Methods Reference)
       const amr = (exchangeData.session as any).amr as Array<{ method: string }> | undefined;
       const isRecovery = Array.isArray(amr) && amr.some((a) => a.method === 'otp');
-
-      if (isRecovery) {
-        return NextResponse.redirect(`${origin}/nueva-contrasena`);
-      }
-
-      return NextResponse.redirect(`${origin}${next}`);
+      const destination = isRecovery ? '/nueva-contrasena' : `${next}`;
+      debugParams.set('dest', destination);
+      return NextResponse.redirect(`${origin}/auth/pkce-debug?${debugParams.toString()}`);
     }
 
-    return NextResponse.redirect(`${origin}/iniciar-sesion?error=enlace-invalido`);
+    debugParams.set('dest', '/iniciar-sesion?error=enlace-invalido');
+    if (exchangeError) {
+      debugParams.set('exchange_error', encodeURIComponent(exchangeError.message));
+    }
+    return NextResponse.redirect(`${origin}/auth/pkce-debug?${debugParams.toString()}`);
   }
 
   // ── Path D: Implicit flow — forward to client-side handler ───────────────

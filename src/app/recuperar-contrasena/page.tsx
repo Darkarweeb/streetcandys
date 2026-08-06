@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLogo from '@/components/ui/AppLogo';
@@ -12,6 +12,25 @@ export default function RecuperarContrasenaPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
+
+  // [TEMP PKCE DEBUG] Cookie inspection state
+  const [pkceDebug, setPkceDebug] = useState<{
+    verifierExists: boolean;
+    cookieNames: string[];
+  } | null>(null);
+
+  // [TEMP PKCE DEBUG] Read cookies after email is sent
+  useEffect(() => {
+    if (!sent) return;
+    const names = document.cookie
+      .split(';')
+      .map((c) => c.trim().split('=')[0].trim())
+      .filter(Boolean);
+    const verifierExists = names.some(
+      (n) => n.includes('code-verifier') || n.includes('pkce') || n.includes('auth-code'),
+    );
+    setPkceDebug({ verifierExists, cookieNames: names });
+  }, [sent]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,9 +101,61 @@ export default function RecuperarContrasenaPage() {
                 </span>
                 .
               </p>
-              <p className="text-sm text-center mb-8" style={{ color: '#888' }}>
+              <p className="text-sm text-center mb-6" style={{ color: '#888' }}>
                 Sigue las instrucciones para restablecer tu contraseña.
               </p>
+
+              {/* [TEMP PKCE DEBUG] On-screen cookie inspection panel */}
+              {pkceDebug && (
+                <div
+                  className="mb-6 rounded-xl p-4 text-left text-xs font-mono"
+                  style={{
+                    background: '#0d1117',
+                    border: '1px solid #30363d',
+                    color: '#c9d1d9',
+                  }}
+                >
+                  <p
+                    className="text-xs font-bold uppercase tracking-wider mb-3"
+                    style={{ color: '#58a6ff' }}
+                  >
+                    🔍 PKCE Debug — después de resetPasswordForEmail()
+                  </p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span style={{ color: '#8b949e' }}>Verifier cookie existe:</span>
+                    <span
+                      className="font-bold px-2 py-0.5 rounded"
+                      style={{
+                        background: pkceDebug.verifierExists
+                          ? 'rgba(63,185,80,0.15)'
+                          : 'rgba(248,81,73,0.15)',
+                        color: pkceDebug.verifierExists ? '#3fb950' : '#f85149',
+                      }}
+                    >
+                      {pkceDebug.verifierExists ? 'true ✓' : 'false ✗'}
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{ color: '#8b949e' }}>
+                      Cookies ({pkceDebug.cookieNames.length}):
+                    </span>
+                    {pkceDebug.cookieNames.length === 0 ? (
+                      <span className="ml-2" style={{ color: '#f85149' }}>
+                        ninguna
+                      </span>
+                    ) : (
+                      <ul className="mt-1 ml-2 space-y-0.5">
+                        {pkceDebug.cookieNames.map((name) => (
+                          <li key={name} style={{ color: '#e6edf3' }}>
+                            • {name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <Link
                 href="/iniciar-sesion"
                 className="text-sm font-bold hover:underline"
