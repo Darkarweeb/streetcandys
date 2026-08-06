@@ -56,6 +56,10 @@ export async function GET(request: NextRequest) {
 
   // ── Path C: PKCE authorization code flow (OAuth, magic link, recovery) ───
   if (code) {
+    // [TEMP INSPECTION] List incoming request cookie names — no values logged
+    const incomingCookieNames = request.cookies.getAll().map((c) => c.name);
+    console.log('[PKCE-INSPECT] Cookie names received at /auth/callback:', incomingCookieNames);
+
     const supabase = await createClient();
     const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
