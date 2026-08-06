@@ -192,14 +192,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       redirectTo: `${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback`,
     });
     if (error) throw error;
-    // [TEMP INSPECTION] List cookie names after resetPasswordForEmail — no values logged
-    if (typeof document !== 'undefined') {
-      const cookieNames = document.cookie
-        .split(';')
-        .map((c) => c.trim().split('=')[0].trim())
-        .filter(Boolean);
-      console.log('[PKCE-INSPECT] Cookie names after resetPasswordForEmail():', cookieNames);
-    }
   };
 
   const updatePassword = async (newPassword: string) => {
