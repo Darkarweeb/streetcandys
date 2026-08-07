@@ -805,6 +805,26 @@ export default function CheckoutPage() {
 
     (async () => {
       try {
+        // ── Read items from localStorage snapshot (same source as CartDrawer) ──
+        const snapshot = (() => {
+          try {
+            const raw = localStorage.getItem('sc_cart_snapshot');
+            if (!raw) return null;
+            return JSON.parse(raw) as { items?: Array<{ id: string; name: string; price: string; qty: number; image: string }> };
+          } catch { return null; }
+        })();
+
+        if (snapshot?.items && snapshot.items.length > 0) {
+          setCartItems(snapshot.items.map((item) => ({
+            id: item.id,
+            name: item.name ?? '',
+            price: item.price ?? '',
+            qty: item.qty ?? 1,
+            image: item.image ?? '',
+          })));
+        }
+
+        // ── Fetch API only for carritoId and coupon ──
         const sessionId = localStorage.getItem('sc_session_id') ?? undefined;
         const res = await fetch(`/api/carrito?pais=${activeCountry}`, {
           headers: sessionId ? { 'x-session-id': sessionId } : {},
@@ -813,25 +833,29 @@ export default function CheckoutPage() {
         if (data.exito && data.datos) {
           const cartData = data.datos;
           setCarritoId(cartData.id ?? null);
-          const items: CartItem[] = (cartData.items ?? []).map((item: {
-            id: string;
-            producto_id?: string;
-            nombre?: string;
-            name?: string;
-            precio?: number;
-            price?: string;
-            cantidad?: number;
-            qty?: number;
-            imagen_url?: string;
-            image?: string;
-          }) => ({
-            id: item.producto_id ?? item.id,
-            name: item.nombre ?? item.name ?? '',
-            price: item.price ?? formatPriceValue(item.precio ?? 0, activeCountry),
-            qty: item.cantidad ?? item.qty ?? 1,
-            image: item.imagen_url ?? item.image ?? '',
-          }));
-          setCartItems(items);
+
+          // Only use API items if localStorage snapshot was empty
+          if (!snapshot?.items || snapshot.items.length === 0) {
+            const items: CartItem[] = (cartData.items ?? []).map((item: {
+              id: string;
+              producto_id?: string;
+              nombre?: string;
+              name?: string;
+              precio?: number;
+              price?: string;
+              cantidad?: number;
+              qty?: number;
+              imagen_url?: string;
+              image?: string;
+            }) => ({
+              id: item.producto_id ?? item.id,
+              name: item.nombre ?? item.name ?? '',
+              price: item.price ?? formatPriceValue(item.precio ?? 0, activeCountry),
+              qty: item.cantidad ?? item.qty ?? 1,
+              image: item.imagen_url ?? item.image ?? '',
+            }));
+            setCartItems(items);
+          }
 
           const cupon = cartData.cupon ?? null;
           if (cupon) {
