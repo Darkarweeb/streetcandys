@@ -1613,6 +1613,7 @@ export default function HomePage() {
   const [cartOpen, setCartOpen] = useState(false);
   const { cartItems, setCartItems } = useCartPersistence({ profileId: profile?.id ?? null });
   const featuredRef = useRef<HTMLElement | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   // SSR-safe: always start with 'CO'; read persisted value only after mount
   const [country, setCountry] = useState('CO');
@@ -1628,6 +1629,18 @@ export default function HomePage() {
       }
     }
   }, [profile?.countryCode]);
+
+  // Resolve guest session ID once after mount — avoids typeof window in callbacks
+  useEffect(() => {
+    let sid = localStorage.getItem('sc_guest_session_id');
+    if (!sid) {
+      const ts = Date.now().toString(36);
+      const rand = Math.random().toString(36).substring(2, 10);
+      sid = `sc_guest_${ts}_${rand}`;
+      localStorage.setItem('sc_guest_session_id', sid);
+    }
+    sessionIdRef.current = sid;
+  }, []);
 
   const handleCountryChange = useCallback((code: string) => {
     setCountry(code);
@@ -1664,19 +1677,7 @@ export default function HomePage() {
 
     // 2. Also write to Supabase so Checkout always finds the same cart.
     // Fire-and-forget — UI is already updated above.
-    const sessionId =
-      typeof window !== 'undefined'
-        ? (() => {
-            let sid = localStorage.getItem('sc_guest_session_id');
-            if (!sid) {
-              const ts = Date.now().toString(36);
-              const rand = Math.random().toString(36).substring(2, 10);
-              sid = `sc_guest_${ts}_${rand}`;
-              localStorage.setItem('sc_guest_session_id', sid);
-            }
-            return sid;
-          })()
-        : null;
+    const sessionId = sessionIdRef.current;
 
     if (sessionId) {
       fetch('/api/carrito/items', {
