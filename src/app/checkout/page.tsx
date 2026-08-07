@@ -900,7 +900,11 @@ export default function CheckoutPage() {
           'Content-Type': 'application/json',
           ...(sessionId ? { 'x-session-id': sessionId } : {}),
         },
-        body: JSON.stringify({ codigo: couponInput.trim(), pais: country }),
+        body: JSON.stringify({
+          codigo: couponInput.trim(),
+          pais: country,
+          ...(carritoId ? { carrito_id: carritoId } : {}),
+        }),
       });
       const data = await res.json();
       if (!data.exito) {

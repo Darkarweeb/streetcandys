@@ -31,7 +31,11 @@ async function crearSupabaseServidor() {
 async function obtenerCarritoId(
   request: NextRequest,
   userId: string | null,
+  bodyCarritoId?: string | null,
 ): Promise<string | null> {
+  // If the frontend already resolved the cart ID, use it directly
+  if (bodyCarritoId) return bodyCarritoId;
+
   const { searchParams } = new URL(request.url);
   const sessionId = request.headers.get('x-session-id') ?? searchParams.get('session_id');
 
@@ -52,7 +56,7 @@ export async function POST(request: NextRequest) {
     const supabase = await crearSupabaseServidor();
     const { data: { user } } = await supabase.auth.getUser();
 
-    const body = await request.json() as { codigo: string; pais?: string };
+    const body = await request.json() as { codigo: string; pais?: string; carrito_id?: string };
     const codigoPais = body.pais ?? 'CO';
 
     if (!body.codigo) {
@@ -62,7 +66,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const carritoId = await obtenerCarritoId(request, user?.id ?? null);
+    const carritoId = await obtenerCarritoId(request, user?.id ?? null, body.carrito_id ?? null);
     if (!carritoId) {
       return NextResponse.json(
         { exito: false, error: 'Carrito no encontrado.' },

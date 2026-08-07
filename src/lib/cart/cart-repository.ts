@@ -3,7 +3,7 @@
  * Acceso a datos para carrito de invitados y usuarios autenticados
  */
 
-import { createClient } from '@/lib/supabase/client';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { DbCart, DbCartItem, DbCoupon } from './types';
 import { CARRITO_CONSTANTES } from './types';
 
@@ -16,7 +16,7 @@ export const carritoRepositorio = {
    * Obtiene el carrito de un usuario autenticado por profile_id
    */
   async obtenerPorProfileId(profileId: string): Promise<DbCart | null> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('cart')
       .select('*')
@@ -31,7 +31,7 @@ export const carritoRepositorio = {
    * Obtiene el carrito de un invitado por session_id
    */
   async obtenerPorSessionId(sessionId: string): Promise<DbCart | null> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('cart')
       .select('*')
@@ -46,7 +46,7 @@ export const carritoRepositorio = {
    * Obtiene el carrito por su ID
    */
   async obtenerPorId(carritoId: string): Promise<DbCart | null> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('cart')
       .select('*')
@@ -61,7 +61,7 @@ export const carritoRepositorio = {
    * Crea un nuevo carrito para usuario autenticado
    */
   async crearParaUsuario(profileId: string, codigoPais: string): Promise<DbCart> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('cart')
       .insert({
@@ -81,7 +81,7 @@ export const carritoRepositorio = {
    * Crea un nuevo carrito para invitado
    */
   async crearParaInvitado(sessionId: string, codigoPais: string): Promise<DbCart> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('cart')
       .insert({
@@ -101,7 +101,7 @@ export const carritoRepositorio = {
    * Actualiza el país del carrito
    */
   async actualizarPais(carritoId: string, codigoPais: string): Promise<void> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from('cart')
       .update({ country_code: codigoPais, updated_at: new Date().toISOString() })
@@ -114,7 +114,7 @@ export const carritoRepositorio = {
    * Aplica un cupón al carrito
    */
   async aplicarCupon(carritoId: string, cuponId: string): Promise<void> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from('cart')
       .update({ coupon_id: cuponId, updated_at: new Date().toISOString() })
@@ -127,7 +127,7 @@ export const carritoRepositorio = {
    * Elimina el cupón del carrito
    */
   async eliminarCupon(carritoId: string): Promise<void> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from('cart')
       .update({ coupon_id: null, updated_at: new Date().toISOString() })
@@ -143,7 +143,7 @@ export const carritoRepositorio = {
     sessionId: string,
     profileId: string,
   ): Promise<void> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     // Actualiza el carrito del invitado asignándolo al usuario
     const { error } = await supabase
       .from('cart')
@@ -162,7 +162,7 @@ export const carritoRepositorio = {
    * Elimina un carrito por ID
    */
   async eliminar(carritoId: string): Promise<void> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from('cart')
       .delete()
@@ -175,7 +175,7 @@ export const carritoRepositorio = {
    * Elimina carritos de invitado antiguos (más de 30 días)
    */
   async limpiarCarritosInvitadoAntiguos(): Promise<void> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const hace30Dias = new Date();
     hace30Dias.setDate(hace30Dias.getDate() - 30);
 
@@ -198,7 +198,7 @@ export const itemsCarritoRepositorio = {
    * Obtiene todos los ítems de un carrito con datos del producto
    */
   async obtenerPorCarritoId(carritoId: string): Promise<ItemCarritoConProducto[]> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('cart_items')
       .select(`
@@ -230,7 +230,7 @@ export const itemsCarritoRepositorio = {
    * Obtiene un ítem específico del carrito
    */
   async obtenerPorId(itemId: string): Promise<DbCartItem | null> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('cart_items')
       .select('*')
@@ -249,7 +249,7 @@ export const itemsCarritoRepositorio = {
     productoId: string,
     varianteId: string | null,
   ): Promise<DbCartItem | null> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     let query = supabase
       .from('cart_items')
       .select('*')
@@ -277,7 +277,7 @@ export const itemsCarritoRepositorio = {
     cantidad: number,
     precioUnitario: number,
   ): Promise<DbCartItem> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('cart_items')
       .insert({
@@ -298,7 +298,7 @@ export const itemsCarritoRepositorio = {
    * Actualiza la cantidad de un ítem
    */
   async actualizarCantidad(itemId: string, cantidad: number): Promise<DbCartItem> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('cart_items')
       .update({ quantity: cantidad, updated_at: new Date().toISOString() })
@@ -314,7 +314,7 @@ export const itemsCarritoRepositorio = {
    * Actualiza el precio unitario de un ítem (para sincronización de precios)
    */
   async actualizarPrecio(itemId: string, precioUnitario: number): Promise<void> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from('cart_items')
       .update({ unit_price: precioUnitario, updated_at: new Date().toISOString() })
@@ -327,7 +327,7 @@ export const itemsCarritoRepositorio = {
    * Elimina un ítem del carrito
    */
   async eliminar(itemId: string): Promise<void> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from('cart_items')
       .delete()
@@ -340,7 +340,7 @@ export const itemsCarritoRepositorio = {
    * Elimina todos los ítems de un carrito
    */
   async vaciar(carritoId: string): Promise<void> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from('cart_items')
       .delete()
@@ -353,7 +353,7 @@ export const itemsCarritoRepositorio = {
    * Cuenta los ítems de un carrito
    */
   async contarItems(carritoId: string): Promise<number> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { count, error } = await supabase
       .from('cart_items')
       .select('*', { count: 'exact', head: true })
@@ -370,7 +370,7 @@ export const itemsCarritoRepositorio = {
     carritoOrigenId: string,
     carritoDestinoId: string,
   ): Promise<void> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const itemsOrigen = await this.obtenerPorCarritoId(carritoOrigenId);
 
     for (const item of itemsOrigen) {
@@ -408,7 +408,7 @@ export const cuponRepositorio = {
    * Busca un cupón por código
    */
   async obtenerPorCodigo(codigo: string): Promise<DbCoupon | null> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('coupons')
       .select('*')
@@ -423,7 +423,7 @@ export const cuponRepositorio = {
    * Obtiene un cupón por ID
    */
   async obtenerPorId(cuponId: string): Promise<DbCoupon | null> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('coupons')
       .select('*')
@@ -438,7 +438,7 @@ export const cuponRepositorio = {
    * Verifica cuántas veces un usuario ha usado un cupón
    */
   async contarUsosPorUsuario(cuponId: string, profileId: string): Promise<number> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { count, error } = await supabase
       .from('coupon_redemptions')
       .select('*', { count: 'exact', head: true })
@@ -462,7 +462,7 @@ export const recompensasCarritoRepositorio = {
     points_balance: number;
     tier: string;
   } | null> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('rewards')
       .select('points_balance, tier')
@@ -486,7 +486,7 @@ export const inventarioCarritoRepositorio = {
     productoId: string,
     varianteId: string | null,
   ): Promise<{ quantity: number; reserved_quantity: number; allow_backorder: boolean } | null> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
     let query = supabase
       .from('inventory')
       .select('quantity, reserved_quantity, allow_backorder')
@@ -510,7 +510,7 @@ export const inventarioCarritoRepositorio = {
     productoId: string,
     varianteId: string | null,
   ): Promise<number | null> {
-    const supabase = createClient();
+    const supabase = createAdminClient();
 
     if (varianteId) {
       const { data, error } = await supabase
