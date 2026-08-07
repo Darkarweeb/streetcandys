@@ -174,9 +174,13 @@ export const servicioCheckout = {
     // ── 11. Crear orden ───────────────────────────────────────
     const numeroOrden = generarNumeroOrden(input.codigo_pais);
 
+    // Guest users do not have a real profile UUID.
+    // The orders.profile_id column is UUID (nullable) — pass null for guests.
+    const ordenProfileId = profileId.startsWith('guest-') ? null : profileId;
+
     const orden = await repositorioOrdenes.crear({
       order_number: numeroOrden,
-      profile_id: profileId,
+      profile_id: ordenProfileId,
       country_code: input.codigo_pais,
       shipping_address_id: direccionEnvioId,
       billing_address_id: direccionFacturacionId,
@@ -203,6 +207,18 @@ export const servicioCheckout = {
         puntos_recompensa_usados: puntosAUsar,
         descuento_cupon: descuentoCupon,
         descuento_recompensas: descuentoRecompensas,
+        // Customer & delivery fields — stored so the confirmation page can
+        // build the WhatsApp message even when shipping_address_id is null
+        // (guest orders) or when the address join returns no rows.
+        nombre_cliente: input.direccion_envio.nombre_completo,
+        email_contacto: email,
+        telefono: input.direccion_envio.telefono ?? null,
+        metodo_entrega: input.metodo_entrega ?? null,
+        direccion_linea1: input.direccion_envio.linea1,
+        direccion_linea2: input.direccion_envio.linea2 ?? null,
+        ciudad: input.direccion_envio.ciudad,
+        departamento_provincia: input.direccion_envio.departamento_provincia,
+        codigo_postal: input.direccion_envio.codigo_postal ?? null,
       },
     });
 

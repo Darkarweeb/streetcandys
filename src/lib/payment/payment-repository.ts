@@ -14,23 +14,35 @@ import { loggerPagos } from '../payment/logger';
 
 export const repositorioPagos = {
   /**
-   * Actualiza la referencia del proveedor y estado de pago en una orden
+   * Actualiza la referencia del proveedor y estado de pago en una orden.
+   * payment_method is only written when it is a valid enum value (not null, not "manual").
+   * When require_payment_method is OFF the order already holds payment_method = null;
+   * this function must not overwrite it with the provider name "manual".
    */
   async actualizarReferenciaPago(
     ordenId: string,
     referencia: string,
-    metodo: MetodoPago,
+    metodo: MetodoPago | null,
     estado: EstadoPago,
   ): Promise<void> {
     const supabase = await createClient();
+
+    // Only include payment_method in the update when it is a real enum value.
+    // "manual" is the internal provider name — it is NOT a valid PostgreSQL enum value
+    // and must never be written to the orders table.
+    const updatePayload: Record<string, unknown> = {
+      payment_reference: referencia,
+      payment_status: estado,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (metodo !== null && (metodo as string) !== 'manual') {
+      updatePayload.payment_method = metodo;
+    }
+
     const { error } = await supabase
       .from('orders')
-      .update({
-        payment_reference: referencia,
-        payment_method: metodo,
-        payment_status: estado,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', ordenId);
 
     if (error) {
