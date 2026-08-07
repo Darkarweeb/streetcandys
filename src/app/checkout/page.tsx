@@ -1311,6 +1311,19 @@ export default function CheckoutPage() {
                 </div>
               )}
 
+              {/* CR informational notice */}
+              {country === 'CR' && (
+                <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-blue-500 flex-shrink-0 mt-0.5" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  <p className="text-blue-800 text-xs leading-relaxed">
+                    <strong>Pagos con tarjeta próximamente en Costa Rica</strong> — completa tu pedido por WhatsApp.
+                  </p>
+                </div>
+              )}
+
               {/* Submit */}
               <button
                 type="submit"
