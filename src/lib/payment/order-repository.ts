@@ -3,7 +3,7 @@
  * Acceso a datos para órdenes y sus ítems.
  */
 
-import { createClient } from '../supabase/server';
+import { createAdminClient } from '../supabase/admin';
 import type {
   DbOrden,
   DbItemOrden,
@@ -24,7 +24,7 @@ export const repositorioOrdenes = {
    * Crea una nueva orden en la base de datos
    */
   async crear(datos: Omit<DbOrden, 'id' | 'created_at' | 'updated_at'>): Promise<DbOrden> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const { data, error } = await supabase
       .from('orders')
       .insert(datos)
@@ -45,7 +45,7 @@ export const repositorioOrdenes = {
   async crearItems(
     items: Omit<DbItemOrden, 'id' | 'created_at'>[],
   ): Promise<DbItemOrden[]> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const { data, error } = await supabase
       .from('order_items')
       .insert(items)
@@ -63,7 +63,7 @@ export const repositorioOrdenes = {
    * Obtiene una orden por ID con todos sus detalles
    */
   async obtenerPorId(ordenId: string): Promise<OrdenCompleta | null> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -90,7 +90,7 @@ export const repositorioOrdenes = {
    * Obtiene una orden por número de orden
    */
   async obtenerPorNumero(numeroOrden: string): Promise<DbOrden | null> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const { data, error } = await supabase
       .from('orders')
       .select('*')
@@ -113,7 +113,7 @@ export const repositorioOrdenes = {
     pagina = 1,
     porPagina = 10,
   ): Promise<{ ordenes: DbOrden[]; total: number }> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const offset = (pagina - 1) * porPagina;
 
     const { data, error, count } = await supabase
@@ -137,7 +137,7 @@ export const repositorioOrdenes = {
     nota?: string,
     estimatedDelivery?: string,
   ): Promise<void> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const now = new Date().toISOString();
 
     // Fetch current status_history
@@ -201,7 +201,7 @@ export const repositorioOrdenes = {
       return null;
     }
 
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const { data, error } = await supabase
       .from('addresses')
       .insert({
@@ -231,7 +231,7 @@ export const repositorioOrdenes = {
     profileId: string,
     codigoPais: string,
   ): Promise<DbDireccion | null> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const { data, error } = await supabase
       .from('addresses')
       .select('*')
@@ -256,7 +256,7 @@ export const repositorioOrdenes = {
     porPagina = 15,
     filtros?: { estado?: string; pago?: string; busqueda?: string },
   ): Promise<{ ordenes: DbOrden[]; total: number }> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const offset = (pagina - 1) * porPagina;
 
     let query = supabase
