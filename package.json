@@ -66,6 +66,7 @@
     "@capacitor/push-notifications": "8.1.2",
     "@capacitor/splash-screen": "8.0.2",
     "@capacitor/status-bar": "8.0.3",
+    "@dhiwise/component-tagger": "latest",
     "@heroicons/react": "^2.2.0",
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "2.111.0",
