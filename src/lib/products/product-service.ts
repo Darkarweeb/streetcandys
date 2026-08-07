@@ -8,7 +8,6 @@ import { categoriaRepositorio } from './category-repository';
 import { resenasRepositorio } from './reviews-repository';
 import {
   calcularEstadoInventario,
-  calcularResumenResenas,
   construirPaginacion,
   normalizarPaginacion,
 } from './utils';
@@ -240,11 +239,11 @@ async function resolverFiltroCategoria(filtros: ProductFilters): Promise<Product
 }
 
 async function construirDetalleProducto(producto: DbProduct): Promise<ProductWithDetails> {
-  const [categoria, variantes, inventario, resenas] = await Promise.all([
+  const [categoria, variantes, inventario, resumenResenas] = await Promise.all([
     producto.category_id ? categoriaRepositorio.obtenerPorId(producto.category_id) : null,
     varianteRepositorio.obtenerPorProducto(producto.id),
     inventarioRepositorio.obtenerPorProducto(producto.id),
-    resenasRepositorio.obtenerPorProducto(producto.id),
+    resenasRepositorio.obtenerResumen(producto.id),
   ]);
 
   // Enriquece variantes con inventario
@@ -260,8 +259,6 @@ async function construirDetalleProducto(producto: DbProduct): Promise<ProductWit
       };
     }),
   );
-
-  const resumenResenas = calcularResumenResenas(resenas);
 
   // Productos relacionados
   const relacionados = await productoRepositorio.obtenerRelacionados(
@@ -287,13 +284,13 @@ async function enriquecerConResumen(productos: DbProduct[]): Promise<ProductSumm
   // Obtiene inventario y reseñas en paralelo para todos los productos
   const [inventarios, resenasMap, categoriasMap] = await Promise.all([
     Promise.all(productos.map((p) => inventarioRepositorio.obtenerPorProducto(p.id))),
-    Promise.all(productos.map((p) => resenasRepositorio.obtenerPorProducto(p.id))),
+    Promise.all(productos.map((p) => resenasRepositorio.obtenerResumen(p.id))),
     obtenerCategoriasParaProductos(productos),
   ]);
 
   return productos.map((producto, i) => {
     const inv = inventarios[i];
-    const resenas = resenasMap[i];
+    const resumenResenas = resenasMap[i];
     const categoria = categoriasMap[producto.category_id ?? ''] ?? null;
 
     return {
@@ -302,7 +299,7 @@ async function enriquecerConResumen(productos: DbProduct[]): Promise<ProductSumm
         ? { id: categoria.id, name: categoria.name, slug: categoria.slug }
         : null,
       inventory_status: calcularEstadoInventario(inv),
-      reviews_summary: calcularResumenResenas(resenas),
+      reviews_summary: resumenResenas,
     };
   });
 }
@@ -330,6 +327,7 @@ function mapearAResumen(producto: DbProduct): ProductSummary {
     base_price: producto.base_price,
     compare_at_price: producto.compare_at_price,
     price_crc: producto.price_crc ?? null,
+    price_cop: producto.price_cop ?? null,
     thumbnail_url: producto.thumbnail_url,
     images: producto.images as import('./types').ProductImage[],
     tags: producto.tags,
