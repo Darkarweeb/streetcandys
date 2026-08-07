@@ -1643,6 +1643,7 @@ export default function HomePage() {
   }, [user]);
 
   const handleAddToCart = useCallback((product: ProductSummary) => {
+    // 1. Update local state immediately for instant UI feedback
     setCartItems((prev) => {
       const existing = prev.find((i) => i.id === product.id);
       if (existing) {
@@ -1660,7 +1661,40 @@ export default function HomePage() {
       ];
     });
     setCartOpen(true);
-  }, [setCartItems]);
+
+    // 2. Also write to Supabase so Checkout always finds the same cart.
+    // Fire-and-forget — UI is already updated above.
+    const sessionId =
+      typeof window !== 'undefined'
+        ? (() => {
+            let sid = localStorage.getItem('sc_guest_session_id');
+            if (!sid) {
+              const ts = Date.now().toString(36);
+              const rand = Math.random().toString(36).substring(2, 10);
+              sid = `sc_guest_${ts}_${rand}`;
+              localStorage.setItem('sc_guest_session_id', sid);
+            }
+            return sid;
+          })()
+        : null;
+
+    if (sessionId) {
+      fetch('/api/carrito/items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-id': sessionId,
+        },
+        body: JSON.stringify({
+          producto_id: product.id,
+          cantidad: 1,
+          pais: country,
+        }),
+      }).catch(() => {
+        // best-effort — local state is already updated
+      });
+    }
+  }, [setCartItems, country]);
 
   const handleUpdateQty = useCallback((id: string, qty: number) => {
     if (qty <= 0) {

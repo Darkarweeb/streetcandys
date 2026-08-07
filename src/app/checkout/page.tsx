@@ -922,29 +922,33 @@ export default function CheckoutPage() {
         // If the Supabase cart is empty, sync from localStorage snapshot.
         const apiItems: Array<{
           id: string;
+          // CarritoCompleto field names (from cart-service ensamblarCarritoCompleto)
+          producto_id?: string;
+          variante_id?: string | null;
+          cantidad?: number;
+          precio_unitario?: number;
+          producto?: { nombre?: string; thumbnail_url?: string | null };
+          // Legacy / fallback field names
           product_id?: string;
           variant_id?: string | null;
           nombre?: string;
           name?: string;
-          precio_unitario?: number;
           price?: string;
-          cantidad?: number;
           qty?: number;
           imagen_url?: string;
           image?: string;
-          producto?: { nombre?: string; thumbnail_url?: string | null };
         }> = cartData.items ?? [];
 
         if (apiItems.length > 0) {
           // Supabase cart has items — use them directly
           const items: CartItem[] = apiItems.map((item) => ({
             id: item.id,
-            product_id: item.product_id ?? item.id,
-            variant_id: item.variant_id ?? null,
+            product_id: item.producto_id ?? item.product_id ?? item.id,
+            variant_id: item.variante_id ?? item.variant_id ?? null,
             name: item.producto?.nombre ?? item.nombre ?? item.name ?? '',
             price: item.price ?? formatPriceValue(item.precio_unitario ?? 0, activeCountry),
             qty: item.cantidad ?? item.qty ?? 1,
-            image: item.imagen_url ?? item.producto?.thumbnail_url ?? item.image ?? '',
+            image: item.producto?.thumbnail_url ?? item.imagen_url ?? item.image ?? '',
           }));
           setCartItems(items);
         } else {
@@ -972,7 +976,7 @@ export default function CheckoutPage() {
           if (snapshotItems.length > 0 && sessionId) {
             // Sync snapshot items into the canonical Supabase cart.
             // CRITICAL: use item.product_id (not item.id which is the cart_item UUID).
-            const syncResults = await Promise.allSettled(
+            await Promise.allSettled(
               snapshotItems.map((item) =>
                 fetch('/api/carrito/items', {
                   method: 'POST',
@@ -999,12 +1003,12 @@ export default function CheckoutPage() {
             if (syncedData.exito && syncedData.datos?.items?.length > 0) {
               const syncedItems: CartItem[] = (syncedData.datos.items as typeof apiItems).map((item) => ({
                 id: item.id,
-                product_id: item.product_id ?? item.id,
-                variant_id: item.variant_id ?? null,
-                name: item.produto?.nombre ?? item.nombre ?? item.name ?? '',
+                product_id: item.producto_id ?? item.product_id ?? item.id,
+                variant_id: item.variante_id ?? item.variant_id ?? null,
+                name: item.producto?.nombre ?? item.nombre ?? item.name ?? '',
                 price: item.price ?? formatPriceValue(item.precio_unitario ?? 0, activeCountry),
                 qty: item.cantidad ?? item.qty ?? 1,
-                image: item.imagen_url ?? item.produto?.thumbnail_url ?? item.image ?? '',
+                image: item.producto?.thumbnail_url ?? item.imagen_url ?? item.image ?? '',
               }));
               setCartItems(syncedItems);
             } else {
