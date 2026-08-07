@@ -116,6 +116,8 @@ export default function CartDrawer({
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponSuccess, setCouponSuccess] = useState<string | null>(null);
+  // Canonical cart ID resolved on drawer open — reused for all coupon operations
+  const [drawerCarritoId, setDrawerCarritoId] = useState<string | null>(null);
 
   // WhatsApp checkout loading state
   const [waLoading2, setWaLoading2] = useState(false);
@@ -128,18 +130,24 @@ export default function CartDrawer({
     (async () => {
       try {
         const sessionId =
-          typeof window !== 'undefined' ? (localStorage.getItem('sc_session_id') ?? undefined) : undefined;
+          typeof window !== 'undefined' ? (localStorage.getItem('sc_guest_session_id') ?? undefined) : undefined;
         const res = await fetch(`/api/carrito?pais=${activeCountry}`, {
           headers: sessionId ? { 'x-session-id': sessionId } : {},
         });
         const data = await res.json();
-        if (data.exito && data.datos?.cupon) {
-          const cupon = data.datos.cupon;
-          setAppliedCoupon({
-            code: cupon.codigo,
-            discount: cupon.descuento_calculado ?? 0,
-            type: cupon.tipo_descuento ?? '',
-          });
+        if (data.exito && data.datos) {
+          // Capture the canonical cart ID for all subsequent operations
+          setDrawerCarritoId(data.datos.id ?? null);
+          if (data.datos.cupon) {
+            const cupon = data.datos.cupon;
+            setAppliedCoupon({
+              code: cupon.codigo,
+              discount: cupon.descuento_calculado ?? 0,
+              type: cupon.tipo_descuento ?? '',
+            });
+          } else {
+            setAppliedCoupon(null);
+          }
         } else {
           setAppliedCoupon(null);
         }
@@ -157,14 +165,19 @@ export default function CartDrawer({
     setCouponSuccess(null);
     try {
       const sessionId =
-        typeof window !== 'undefined' ? (localStorage.getItem('sc_session_id') ?? undefined) : undefined;
+        typeof window !== 'undefined' ? (localStorage.getItem('sc_guest_session_id') ?? undefined) : undefined;
       const res = await fetch('/api/carrito/cupon', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(sessionId ? { 'x-session-id': sessionId } : {}),
         },
-        body: JSON.stringify({ codigo: code, pais: activeCountry }),
+        body: JSON.stringify({
+          codigo: code,
+          pais: activeCountry,
+          // Always pass the resolved cart ID so the API never needs to re-lookup
+          ...(drawerCarritoId ? { carrito_id: drawerCarritoId } : {}),
+        }),
       });
       const data = await res.json();
       if (!data.exito) {
@@ -197,7 +210,7 @@ export default function CartDrawer({
     setCouponSuccess(null);
     try {
       const sessionId =
-        typeof window !== 'undefined' ? (localStorage.getItem('sc_session_id') ?? undefined) : undefined;
+        typeof window !== 'undefined' ? (localStorage.getItem('sc_guest_session_id') ?? undefined) : undefined;
       await fetch(`/api/carrito/cupon?pais=${activeCountry}`, {
         method: 'DELETE',
         headers: sessionId ? { 'x-session-id': sessionId } : {},
@@ -225,7 +238,7 @@ export default function CartDrawer({
     (async () => {
       try {
         const sessionId =
-          typeof window !== 'undefined' ? (localStorage.getItem('sc_session_id') ?? undefined) : undefined;
+          typeof window !== 'undefined' ? (localStorage.getItem('sc_guest_session_id') ?? undefined) : undefined;
         const res = await fetch(`/api/carrito?pais=${activeCountry}`, {
           headers: sessionId ? { 'x-session-id': sessionId } : {},
         });
@@ -268,7 +281,7 @@ export default function CartDrawer({
 
     try {
       const sessionId =
-        typeof window !== 'undefined' ? (localStorage.getItem('sc_session_id') ?? undefined) : undefined;
+        typeof window !== 'undefined' ? (localStorage.getItem('sc_guest_session_id') ?? undefined) : undefined;
 
       const res = await fetch('/api/carrito/whatsapp-checkout', {
         method: 'POST',

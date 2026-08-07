@@ -14,13 +14,15 @@ import { formatPriceValue, type Country } from '@/lib/price';
 import ProductReviewsSection from '@/components/ProductReviewsSection';
 
 const COUNTRY_KEY = 'sc_country';
-const SESSION_KEY = 'sc_session_id';
+const SESSION_KEY = 'sc_guest_session_id';
 
 function getOrCreateSessionId(): string {
   if (typeof window === 'undefined') return '';
   let sid = localStorage.getItem(SESSION_KEY);
   if (!sid) {
-    sid = crypto.randomUUID();
+    const ts = Date.now().toString(36);
+    const rand = Math.random().toString(36).substring(2, 10);
+    sid = `sc_guest_${ts}_${rand}`;
     localStorage.setItem(SESSION_KEY, sid);
   }
   return sid;

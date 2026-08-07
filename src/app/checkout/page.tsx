@@ -903,8 +903,10 @@ export default function CheckoutPage() {
           } catch { return null; }
         })();
 
-        if (snapshot?.items && snapshot.items.length > 0) {
-          setCartItems(snapshot.items.map((item) => ({
+        const snapshotItems = snapshot?.items ?? [];
+
+        if (snapshotItems.length > 0) {
+          setCartItems(snapshotItems.map((item) => ({
             id: item.id,
             name: item.name ?? '',
             price: item.price ?? '',
@@ -913,19 +915,44 @@ export default function CheckoutPage() {
           })));
         }
 
-        // ── Fetch API only for carritoId and coupon ──
-        const sessionId = localStorage.getItem('sc_session_id') ?? undefined;
+        // ── Fetch API for carritoId and coupon ──
+        const sessionId = localStorage.getItem('sc_guest_session_id') ?? undefined;
         const res = await fetch(`/api/carrito?pais=${activeCountry}`, {
           headers: sessionId ? { 'x-session-id': sessionId } : {},
         });
         const data = await res.json();
         if (data.exito && data.datos) {
           const cartData = data.datos;
-          setCarritoId(cartData.id ?? null);
+          const resolvedCarritoId: string = cartData.id ?? null;
+          setCarritoId(resolvedCarritoId);
+
+          const apiItems: unknown[] = cartData.items ?? [];
+
+          // ── Sync localStorage items into Supabase cart if API cart is empty ──
+          // This happens when items were added from the homepage (localStorage only)
+          if (snapshotItems.length > 0 && apiItems.length === 0 && resolvedCarritoId && sessionId) {
+            // Push each snapshot item into the Supabase cart
+            await Promise.allSettled(
+              snapshotItems.map((item) =>
+                fetch('/api/carrito/items', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-session-id': sessionId,
+                  },
+                  body: JSON.stringify({
+                    producto_id: item.id,
+                    cantidad: item.qty,
+                    pais: activeCountry,
+                  }),
+                }),
+              ),
+            );
+          }
 
           // Only use API items if localStorage snapshot was empty
-          if (!snapshot?.items || snapshot.items.length === 0) {
-            const items: CartItem[] = (cartData.items ?? []).map((item: {
+          if (snapshotItems.length === 0) {
+            const items: CartItem[] = (apiItems as Array<{
               id: string;
               producto_id?: string;
               nombre?: string;
@@ -936,7 +963,7 @@ export default function CheckoutPage() {
               qty?: number;
               imagen_url?: string;
               image?: string;
-            }) => ({
+            }>).map((item) => ({
               id: item.producto_id ?? item.id,
               name: item.nombre ?? item.name ?? '',
               price: item.price ?? formatPriceValue(item.precio ?? 0, activeCountry),
@@ -1020,7 +1047,7 @@ export default function CheckoutPage() {
     }
     setCoupon((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const sessionId = localStorage.getItem('sc_session_id') ?? undefined;
+      const sessionId = localStorage.getItem('sc_guest_session_id') ?? undefined;
       const res = await fetch('/api/carrito/cupon', {
         method: 'POST',
         headers: {
@@ -1058,7 +1085,7 @@ export default function CheckoutPage() {
 
   const handleRemoveCoupon = useCallback(async () => {
     try {
-      const sessionId = localStorage.getItem('sc_session_id') ?? undefined;
+      const sessionId = localStorage.getItem('sc_guest_session_id') ?? undefined;
       await fetch(`/api/carrito/cupon?pais=${country}`, {
         method: 'DELETE',
         headers: sessionId ? { 'x-session-id': sessionId } : {},
