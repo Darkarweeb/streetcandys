@@ -14,6 +14,19 @@ import { formatPriceValue, type Country } from '@/lib/price';
 import ProductReviewsSection from '@/components/ProductReviewsSection';
 
 const COUNTRY_KEY = 'sc_country';
+const SESSION_KEY = 'sc_guest_session_id';
+
+function getOrCreateSessionId(): string {
+  if (typeof window === 'undefined') return '';
+  let sid = localStorage.getItem(SESSION_KEY);
+  if (!sid) {
+    const ts = Date.now().toString(36);
+    const rand = Math.random().toString(36).substring(2, 10);
+    sid = `sc_guest_${ts}_${rand}`;
+    localStorage.setItem(SESSION_KEY, sid);
+  }
+  return sid;
+}
 
 const Footer = dynamic(() => import('@/components/Footer'), {
   loading: () => <div className="bg-sc-darkforest h-64 animate-pulse" aria-hidden="true" />,
@@ -31,6 +44,8 @@ interface CartItem {
   price: string;
   qty: number;
   image: string;
+  product_id?: string;
+  variant_id?: string | null;
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -185,19 +200,42 @@ export default function ProductDetailPage() {
     if (!product) return;
 
     try {
+      const sessionId = getOrCreateSessionId();
       const response = await fetch('/api/carrito/items', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-id': sessionId,
+        },
         body: JSON.stringify({
-          product_id: product.id,
-          quantity,
-          ...(selectedVariantId ? { variant_id: selectedVariantId } : {}),
+          producto_id: product.id,
+          cantidad: quantity,
+          pais: country,
+          ...(selectedVariantId ? { variante_id: selectedVariantId } : {}),
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setCartItems(data.items || []);
+        const carritoItems = data.datos?.items ?? [];
+        const mapped: CartItem[] = carritoItems.map((item: {
+          id: string;
+          product_id?: string;
+          variant_id?: string | null;
+          producto?: { nombre?: string; thumbnail_url?: string | null };
+          precio_unitario: number;
+          cantidad: number;
+        }) => ({
+          id: item.id,
+          // Store product_id and variant_id so checkout can sync to Supabase correctly
+          product_id: item.product_id ?? product.id,
+          variant_id: item.variant_id ?? null,
+          name: item.producto?.nombre ?? '',
+          price: String(item.precio_unitario),
+          qty: item.cantidad,
+          image: item.producto?.thumbnail_url ?? '',
+        }));
+        setCartItems(mapped);
         setCartOpen(true);
         setQuantity(1);
       }
@@ -250,7 +288,7 @@ export default function ProductDetailPage() {
     <>
       <Navigation cartCount={cartItems.length} onCartOpen={() => setCartOpen(true)} />
       <AnnouncementBar />
-      <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} items={cartItems} country={country} />
+      <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} items={cartItems} />
 
       <main className="min-h-screen bg-sc-cream overflow-x-hidden">
         {/* Breadcrumbs */}

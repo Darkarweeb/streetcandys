@@ -303,7 +303,7 @@ export const carritoServicio = {
       // Obtener ítems para calcular subtotal
       const itemsDb = await itemsCarritoRepositorio.obtenerPorCarritoId(carritoId);
       const subtotal = itemsDb.reduce(
-        (acc, item) => acc + item.unit_price * item.quantity,
+        (acc, item) => acc + Number(item.unit_price) * item.quantity,
         0,
       );
 

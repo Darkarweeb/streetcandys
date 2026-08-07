@@ -157,6 +157,18 @@ const navItems = [
     ),
   },
   {
+    label: 'Envíos',
+    href: '/admin/envios',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M2 6h10v8H2V6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+        <path d="M12 8h3l2 3v3h-5V8z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+        <circle cx="5" cy="15.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/>
+        <circle cx="13.5" cy="15.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/>
+      </svg>
+    ),
+  },
+  {
     label: 'Configuración',
     href: '/admin/configuracion',
     icon: (

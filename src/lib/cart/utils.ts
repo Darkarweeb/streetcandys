@@ -116,7 +116,7 @@ export function calcularDescuentoCupon(
     maximum_discount: number | null;
   },
 ): number {
-  if (subtotal < cupon.minimum_order_amount) return 0;
+  if (subtotal < Number(cupon.minimum_order_amount)) return 0;
 
   // 'shipping' type waives shipping cost — no subtotal discount
   if (cupon.discount_type === 'shipping') return 0;
@@ -274,10 +274,14 @@ export function validarCupon(
     return { valido: false, motivo: 'El cupón no está disponible en tu país.' };
   }
 
-  if (subtotal < cupon.minimum_order_amount) {
+  // Coerce to number — Supabase NUMERIC(10,2) can arrive as a string in some environments
+  const montoMinimo = Number(cupon.minimum_order_amount) || 0;
+  if (subtotal < montoMinimo) {
+    const simbolo = codigoPais === 'CR' ? '₡' : '$';
+    const montoFormateado = `${simbolo}${Math.round(montoMinimo).toLocaleString('es-CO')}`;
     return {
       valido: false,
-      motivo: `El pedido mínimo para este cupón es ${cupon.minimum_order_amount}.`,
+      motivo: `El pedido mínimo para este cupón es ${montoFormateado}.`,
     };
   }
 

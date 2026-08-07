@@ -1,7 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useWhatsAppSettings } from '@/hooks/useWhatsAppSettings';
 import { formatPriceValue, FREE_SHIPPING_THRESHOLD, type Country } from '@/lib/price';
 import { Spinner } from '@/components/ui/UXHelpers';
 
@@ -24,48 +23,6 @@ interface CartDrawerProps {
   onRemoveItem?: (id: string) => void;
   country?: string;
   coupon?: string;
-}
-
-function buildWhatsAppMessage(
-  items: CartItem[],
-  subtotal: number,
-  country: Country,
-  coupon?: string,
-  couponDiscount?: number,
-  orderNumber?: string,
-): string {
-  const countryLabel = country === 'CR' ? '🇨🇷 Costa Rica' : '🇨🇴 Colombia';
-  const threshold = FREE_SHIPPING_THRESHOLD[country];
-
-  const lines = items
-    .filter((item) => !item.unavailable)
-    .map((item) => {
-      const unitPrice = parseFloat(item.price.replace(/[^0-9.]/g, ''));
-      const lineTotal = unitPrice * item.qty;
-      return `• ${item.name} × ${item.qty} = ${formatPriceValue(lineTotal, country)}`;
-    })
-    .join('\n');
-
-  const discount = couponDiscount ?? 0;
-  const finalTotal = Math.max(0, subtotal - discount);
-  const totalFormatted = formatPriceValue(finalTotal, country);
-  const shippingNote =
-    subtotal >= threshold ? '🚚 Envío gratis' : '🚚 Envío por calcular';
-  const couponLine = coupon
-    ? `\n🏷️ Cupón: ${coupon}${discount > 0 ? ` (−${formatPriceValue(discount, country)})` : ''}`
-    : '';
-  const orderLine = orderNumber ? `\n📋 Pedido: #${orderNumber}` : '';
-
-  return (
-    `Hola 👋, quiero finalizar mi pedido en Street Candy:\n\n` +
-    `🌍 País: ${countryLabel}\n` +
-    orderLine +
-    `\n\n🛒 Productos:\n${lines}` +
-    couponLine +
-    `\n\n${shippingNote}` +
-    `\n💰 Total: ${totalFormatted}` +
-    `\n\n💳 Pago con cripto (BTC, ETH, USDT, USDC) disponible bajo solicitud por este chat.`
-  );
 }
 
 // ─── Animated total value ─────────────────────────────────────────────────────
@@ -102,7 +59,6 @@ export default function CartDrawer({
 }: CartDrawerProps) {
   const isDrawerOpen = open ?? isOpen ?? false;
   const router = useRouter();
-  const { settings, loading: waLoading } = useWhatsAppSettings();
   const activeCountry: Country = country === 'CR' ? 'CR' : 'CO';
   const threshold = FREE_SHIPPING_THRESHOLD[activeCountry];
 
@@ -116,9 +72,9 @@ export default function CartDrawer({
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponSuccess, setCouponSuccess] = useState<string | null>(null);
+  // Canonical cart ID resolved on drawer open — reused for all coupon operations
+  const [drawerCarritoId, setDrawerCarritoId] = useState<string | null>(null);
 
-  // WhatsApp checkout loading state
-  const [waLoading2, setWaLoading2] = useState(false);
   // Checkout button loading state
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
@@ -127,15 +83,25 @@ export default function CartDrawer({
     if (!isDrawerOpen) return;
     (async () => {
       try {
-        const res = await fetch(`/api/carrito?pais=${activeCountry}`);
+        const sessionId =
+          typeof window !== 'undefined' ? (localStorage.getItem('sc_guest_session_id') ?? undefined) : undefined;
+        const res = await fetch(`/api/carrito?pais=${activeCountry}`, {
+          headers: sessionId ? { 'x-session-id': sessionId } : {},
+        });
         const data = await res.json();
-        if (data.exito && data.datos?.cupon) {
-          const cupon = data.datos.cupon;
-          setAppliedCoupon({
-            code: cupon.codigo,
-            discount: cupon.descuento_calculado ?? 0,
-            type: cupon.tipo_descuento ?? '',
-          });
+        if (data.exito && data.datos) {
+          // Capture the canonical cart ID for all subsequent operations
+          setDrawerCarritoId(data.datos.id ?? null);
+          if (data.datos.cupon) {
+            const cupon = data.datos.cupon;
+            setAppliedCoupon({
+              code: cupon.codigo,
+              discount: cupon.descuento_calculado ?? 0,
+              type: cupon.tipo_descuento ?? '',
+            });
+          } else {
+            setAppliedCoupon(null);
+          }
         } else {
           setAppliedCoupon(null);
         }
@@ -152,10 +118,20 @@ export default function CartDrawer({
     setCouponError(null);
     setCouponSuccess(null);
     try {
+      const sessionId =
+        typeof window !== 'undefined' ? (localStorage.getItem('sc_guest_session_id') ?? undefined) : undefined;
       const res = await fetch('/api/carrito/cupon', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigo: code, pais: activeCountry }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionId ? { 'x-session-id': sessionId } : {}),
+        },
+        body: JSON.stringify({
+          codigo: code,
+          pais: activeCountry,
+          // Always pass the resolved cart ID so the API never needs to re-lookup
+          ...(drawerCarritoId ? { carrito_id: drawerCarritoId } : {}),
+        }),
       });
       const data = await res.json();
       if (!data.exito) {
@@ -170,8 +146,8 @@ export default function CartDrawer({
         setAppliedCoupon({ code, discount: descuento, type: tipo });
         setCouponInput('');
         const successMsg =
-          tipo === 'shipping' ?'🎉 ¡Cupón aplicado! Tienes envío gratis en este pedido.'
-            : `🎉 ¡Cupón aplicado! Ahorraste ${formatPriceValue(descuento, activeCountry)}`;
+          tipo === 'shipping' ?'Cupon aplicado! Tienes envio gratis en este pedido.'
+            : `Cupon aplicado! Ahorraste ${formatPriceValue(descuento, activeCountry)}`;
         setCouponSuccess(successMsg);
         setTimeout(() => setCouponSuccess(null), 5000);
       }
@@ -187,7 +163,12 @@ export default function CartDrawer({
     setCouponError(null);
     setCouponSuccess(null);
     try {
-      await fetch(`/api/carrito/cupon?pais=${activeCountry}`, { method: 'DELETE' });
+      const sessionId =
+        typeof window !== 'undefined' ? (localStorage.getItem('sc_guest_session_id') ?? undefined) : undefined;
+      await fetch(`/api/carrito/cupon?pais=${activeCountry}`, {
+        method: 'DELETE',
+        headers: sessionId ? { 'x-session-id': sessionId } : {},
+      });
     } catch {
       // best-effort
     } finally {
@@ -210,7 +191,11 @@ export default function CartDrawer({
     if (appliedCoupon.type === 'shipping') return;
     (async () => {
       try {
-        const res = await fetch(`/api/carrito?pais=${activeCountry}`);
+        const sessionId =
+          typeof window !== 'undefined' ? (localStorage.getItem('sc_guest_session_id') ?? undefined) : undefined;
+        const res = await fetch(`/api/carrito?pais=${activeCountry}`, {
+          headers: sessionId ? { 'x-session-id': sessionId } : {},
+        });
         const data = await res.json();
         if (data.exito && data.datos?.cupon) {
           const cupon = data.datos.cupon;
@@ -234,49 +219,8 @@ export default function CartDrawer({
   const progress = Math.min(100, (subtotal / threshold) * 100);
   const finalTotal = Math.max(0, subtotal - couponDiscount);
 
-  const showWhatsApp =
-    !waLoading &&
-    settings.checkout_via_whatsapp_enabled &&
-    settings.phone.trim() !== '' &&
-    availableItems.length > 0;
-
-  const handleWhatsAppCheckout = async () => {
-    if (waLoading2) return;
-    setWaLoading2(true);
-    let orderNumber: string | undefined;
-
-    try {
-      const sessionId =
-        typeof window !== 'undefined' ? (localStorage.getItem('sc_session_id') ?? undefined) : undefined;
-
-      const res = await fetch('/api/carrito/whatsapp-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pais: activeCountry, session_id: sessionId }),
-      });
-
-      const data = await res.json();
-      if (data.exito && data.datos?.numero_orden) {
-        orderNumber = data.datos.numero_orden as string;
-      }
-    } catch {
-      // Non-blocking
-    } finally {
-      setWaLoading2(false);
-    }
-
-    const message = buildWhatsAppMessage(
-      availableItems,
-      subtotal,
-      activeCountry,
-      appliedCoupon?.code ?? coupon,
-      couponDiscount,
-      orderNumber,
-    );
-    const encoded = encodeURIComponent(message);
-    window.open(`https://wa.me/${settings.phone}?text=${encoded}`, '_blank', 'noopener,noreferrer');
-  };
-
+  // Both Colombia and Costa Rica always go through Checkout.
+  // The Cart Drawer NEVER opens WhatsApp directly.
   const handleCheckout = () => {
     if (checkoutLoading) return;
     setCheckoutLoading(true);
@@ -324,7 +268,7 @@ export default function CartDrawer({
         {/* Free shipping progress */}
         <div className="px-6 py-3 bg-sc-beige/50 flex-shrink-0">
           {shippingFree ? (
-            <p className="text-sc-green text-xs font-bold mb-2">✓ ¡Tienes envío gratis!</p>
+            <p className="text-sc-green text-xs font-bold mb-2">Envio gratis aplicado!</p>
           ) : (
             <p className="text-sc-forest text-xs font-medium mb-2">
               Agrega <strong>{remainingFormatted}</strong> más para obtener envío gratis
@@ -347,7 +291,7 @@ export default function CartDrawer({
                 <circle cx="28" cy="56" r="4" fill="currentColor"/>
                 <circle cx="52" cy="56" r="4" fill="currentColor"/>
               </svg>
-              <h2 className="text-sc-forest font-bold text-2xl">¡Carrito vacío!</h2>
+              <h2 className="text-sc-forest font-bold text-2xl">Carrito vacío</h2>
               <p className="text-sc-muted text-sm">Agrega productos de Street Candy para comenzar.</p>
             </div>
           ) : (
@@ -434,7 +378,7 @@ export default function CartDrawer({
                       <span className="text-green-700 text-xs font-medium">Envío gratis</span>
                     ) : (
                       <span className="text-green-700 text-xs font-medium">
-                        −{formatPriceValue(appliedCoupon.discount, activeCountry)}
+                        -{formatPriceValue(appliedCoupon.discount, activeCountry)}
                       </span>
                     )}
                   </div>
@@ -476,7 +420,7 @@ export default function CartDrawer({
               )}
               {couponError && (
                 <p className="text-red-600 text-xs mt-1.5 font-medium flex items-center gap-1" role="alert">
-                  <span aria-hidden="true">⚠</span> {couponError}
+                  <span aria-hidden="true">!</span> {couponError}
                 </p>
               )}
               {couponSuccess && (
@@ -498,14 +442,14 @@ export default function CartDrawer({
                 <div className="flex items-center justify-between">
                   <span className="text-green-700 text-sm">Descuento ({appliedCoupon.code})</span>
                   <span className="text-green-700 font-semibold text-sm">
-                    −<AnimatedValue value={couponDiscount} country={activeCountry} />
+                    -<AnimatedValue value={couponDiscount} country={activeCountry} />
                   </span>
                 </div>
               )}
               {appliedCoupon?.type === 'shipping' && (
                 <div className="flex items-center justify-between">
                   <span className="text-green-700 text-sm">Envío ({appliedCoupon.code})</span>
-                  <span className="text-green-700 font-semibold text-sm">Gratis 🎉</span>
+                  <span className="text-green-700 font-semibold text-sm">Gratis</span>
                 </div>
               )}
               {(appliedCoupon && couponDiscount > 0) && (
@@ -519,91 +463,23 @@ export default function CartDrawer({
             </div>
           )}
 
-          {activeCountry === 'CR' ? (
-            <>
-              {showWhatsApp && (
-                <>
-                  <p className="text-sc-muted text-xs text-center mb-3 leading-snug">
-                    Pago con tarjeta disponible próximamente en Costa Rica — finaliza tu pedido por WhatsApp 👇
-                  </p>
-                  <button
-                    onClick={handleWhatsAppCheckout}
-                    disabled={waLoading2}
-                    className="w-full bg-sc-forest text-sc-cream font-bold py-4 rounded-pill hover:bg-sc-green active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 min-h-[52px] disabled:opacity-70"
-                  >
-                    {waLoading2 ? (
-                      <Spinner size={18} className="text-sc-cream" />
-                    ) : (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                      </svg>
-                    )}
-                    {waLoading2 ? 'Preparando pedido...' : 'Finalizar pedido por WhatsApp'}
-                  </button>
-                  {/* WhatsApp confirmation note */}
-                  <p className="text-sc-muted text-xs text-center mt-2 leading-snug">
-                    📋 El equipo de Street Candy&apos;s confirmará tu pedido por WhatsApp
-                  </p>
-                </>
-              )}
-              {!showWhatsApp && items.length > 0 && (
-                <p className="text-sc-muted text-xs text-center leading-snug">
-                  Pago con tarjeta disponible próximamente en Costa Rica — finaliza tu pedido por WhatsApp 👇
-                </p>
-              )}
-              {items.length === 0 && (
-                <button
-                  onClick={onClose}
-                  className="w-full bg-sc-forest text-sc-cream font-bold py-4 rounded-pill hover:bg-sc-green active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 min-h-[52px]"
-                >
-                  Continuar comprando
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              <button
-                onClick={items.length === 0 ? onClose : handleCheckout}
-                disabled={checkoutLoading}
-                className="w-full bg-sc-forest text-sc-cream font-bold py-4 rounded-pill hover:bg-sc-green active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 min-h-[52px] disabled:opacity-70"
-              >
-                {checkoutLoading ? (
-                  <Spinner size={18} className="text-sc-cream" />
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
-                {checkoutLoading ? 'Cargando...' : items.length === 0 ? 'Continuar comprando' : 'Finalizar compra'}
-              </button>
-
-              {showWhatsApp && (
-                <>
-                  <button
-                    onClick={handleWhatsAppCheckout}
-                    disabled={waLoading2}
-                    className="mt-3 w-full border border-sc-forest text-sc-forest font-semibold py-3 rounded-pill hover:bg-sc-forest hover:text-sc-cream active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 text-sm min-h-[44px] disabled:opacity-70"
-                  >
-                    {waLoading2 ? (
-                      <Spinner size={14} />
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                      </svg>
-                    )}
-                    {waLoading2 ? 'Preparando...' : 'Finalizar pedido por WhatsApp'}
-                  </button>
-                  {/* WhatsApp confirmation note */}
-                  <p className="text-sc-muted text-xs text-center mt-2 leading-snug">
-                    📋 El equipo de Street Candy&apos;s confirmará tu pedido por WhatsApp
-                  </p>
-                </>
-              )}
-            </>
-          )}
+          {/* ── Single CTA: always go to Checkout ───────────────────────────── */}
+          {/* Both Colombia and Costa Rica use the same button. The only difference
+              is the final action button INSIDE the Checkout page. */}
+          <button
+            onClick={items.length === 0 ? onClose : handleCheckout}
+            disabled={checkoutLoading}
+            className="w-full bg-sc-forest text-sc-cream font-bold py-4 rounded-pill hover:bg-sc-green active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 min-h-[52px] disabled:opacity-70"
+          >
+            {checkoutLoading ? (
+              <Spinner size={18} className="text-sc-cream" />
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+            {checkoutLoading ? 'Cargando...' : items.length === 0 ? 'Continuar comprando' : 'Finalizar compra'}
+          </button>
 
           <p className="text-sc-muted text-xs text-center mt-3">
             Debes ser mayor de edad para realizar compras.

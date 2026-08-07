@@ -1613,6 +1613,7 @@ export default function HomePage() {
   const [cartOpen, setCartOpen] = useState(false);
   const { cartItems, setCartItems } = useCartPersistence({ profileId: profile?.id ?? null });
   const featuredRef = useRef<HTMLElement | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   // SSR-safe: always start with 'CO'; read persisted value only after mount
   const [country, setCountry] = useState('CO');
@@ -1629,6 +1630,18 @@ export default function HomePage() {
     }
   }, [profile?.countryCode]);
 
+  // Resolve guest session ID once after mount — avoids typeof window in callbacks
+  useEffect(() => {
+    let sid = localStorage.getItem('sc_guest_session_id');
+    if (!sid) {
+      const ts = Date.now().toString(36);
+      const rand = Math.random().toString(36).substring(2, 10);
+      sid = `sc_guest_${ts}_${rand}`;
+      localStorage.setItem('sc_guest_session_id', sid);
+    }
+    sessionIdRef.current = sid;
+  }, []);
+
   const handleCountryChange = useCallback((code: string) => {
     setCountry(code);
     // Persist for guests; logged-in users rely on profile (no Supabase write here)
@@ -1643,6 +1656,7 @@ export default function HomePage() {
   }, [user]);
 
   const handleAddToCart = useCallback((product: ProductSummary) => {
+    // 1. Update local state immediately for instant UI feedback
     setCartItems((prev) => {
       const existing = prev.find((i) => i.id === product.id);
       if (existing) {
@@ -1660,7 +1674,28 @@ export default function HomePage() {
       ];
     });
     setCartOpen(true);
-  }, [setCartItems]);
+
+    // 2. Also write to Supabase so Checkout always finds the same cart.
+    // Fire-and-forget — UI is already updated above.
+    const sessionId = sessionIdRef.current;
+
+    if (sessionId) {
+      fetch('/api/carrito/items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-id': sessionId,
+        },
+        body: JSON.stringify({
+          producto_id: product.id,
+          cantidad: 1,
+          pais: country,
+        }),
+      }).catch(() => {
+        // best-effort — local state is already updated
+      });
+    }
+  }, [setCartItems, country]);
 
   const handleUpdateQty = useCallback((id: string, qty: number) => {
     if (qty <= 0) {

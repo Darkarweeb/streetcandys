@@ -167,7 +167,7 @@ export const CONFIGURACION_PAISES: Record<string, ConfiguracionPais> = {
     moneda: 'COP',
     simbolo_moneda: '$',
     tasa_impuesto: 0.19,
-    envio_gratis_desde: 150000,
+    envio_gratis_desde: 350000,
     costo_envio_base: 12000,
     costo_envio_por_kg: 3000,
     metodos_pago: ['pse', 'nequi', 'bancolombia', 'stripe'],
