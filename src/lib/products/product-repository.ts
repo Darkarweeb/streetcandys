@@ -310,6 +310,8 @@ export const productoRepositorio = {
         sku: input.sku ?? null,
         base_price: input.base_price,
         compare_at_price: input.compare_at_price ?? null,
+        price_crc: input.price_crc ?? null,
+        price_cop: input.price_cop ?? null,
         images: input.images ?? [],
         thumbnail_url: input.thumbnail_url ?? null,
         tags: input.tags ?? [],

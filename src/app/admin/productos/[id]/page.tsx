@@ -40,6 +40,7 @@ interface ProductFormData {
   base_price: string;
   compare_at_price: string;
   price_crc: string;
+  price_cop: string;
   category_id: string;
   sku: string;
   brand: string;
@@ -59,7 +60,7 @@ interface ProductFormData {
 const FORM_INICIAL: ProductFormData = {
   name: '', slug: '', short_description: '', description: '',
   ingredients: '', usage_instructions: '',
-  base_price: '', compare_at_price: '', price_crc: '',
+  base_price: '', compare_at_price: '', price_crc: '', price_cop: '',
   category_id: '', sku: '', brand: '',
   is_active: true, is_featured: false, requires_age_verification: true,
   tags: '', effects: '', intensity_level: '', origin_country: 'CO',
@@ -650,6 +651,7 @@ export default function AdminProductoEditPage() {
           base_price: String(p.base_price || ''),
           compare_at_price: p.compare_at_price ? String(p.compare_at_price) : '',
           price_crc: p.price_crc != null ? String(p.price_crc) : '',
+          price_cop: p.price_cop != null ? String(p.price_cop) : '',
           category_id: p.category_id || '',
           sku: p.sku || '',
           brand: p.brand || '',
@@ -726,6 +728,7 @@ export default function AdminProductoEditPage() {
       base_price: Number(form.base_price),
       compare_at_price: form.compare_at_price ? Number(form.compare_at_price) : undefined,
       price_crc: form.price_crc ? Number(form.price_crc) : null,
+      price_cop: form.price_cop ? Number(form.price_cop) : null,
       category_id: form.category_id || undefined,
       sku: form.sku || undefined,
       brand: form.brand || undefined,
@@ -901,7 +904,7 @@ export default function AdminProductoEditPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-sc-forest mb-1">Precio base (USD) *</label>
                       <input
@@ -935,6 +938,21 @@ export default function AdminProductoEditPage() {
                         type="number"
                         value={form.price_crc}
                         onChange={(e) => set('price_crc', e.target.value)}
+                        min="0"
+                        step="1"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-sc-forest mb-1">
+                        Precio Colombia (COP)
+                        <span className="ml-1 text-xs text-gray-400 font-normal">pesos</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={form.price_cop}
+                        onChange={(e) => set('price_cop', e.target.value)}
                         min="0"
                         step="1"
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"

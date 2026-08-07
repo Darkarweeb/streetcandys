@@ -40,6 +40,7 @@ export interface DbProduct {
   base_price: number;
   compare_at_price: number | null;
   price_crc: number | null;
+  price_cop: number | null;
   images: ProductImage[];
   thumbnail_url: string | null;
   tags: string[];
@@ -167,6 +168,7 @@ export interface ProductSummary {
   base_price: number;
   compare_at_price: number | null;
   price_crc: number | null;
+  price_cop: number | null;
   thumbnail_url: string | null;
   images: ProductImage[];
   tags: string[];
@@ -256,6 +258,7 @@ export interface CreateProductInput {
   base_price: number;
   compare_at_price?: number;
   price_crc?: number | null;
+  price_cop?: number | null;
   images?: ProductImage[];
   thumbnail_url?: string;
   tags?: string[];
