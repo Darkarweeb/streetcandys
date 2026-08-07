@@ -8,6 +8,7 @@ import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { useWhatsAppSettings } from '@/hooks/useWhatsAppSettings';
 import { useCheckoutSettings } from '@/hooks/useCheckoutSettings';
+import { buildWhatsAppOrderUrl } from '@/lib/whatsapp/message-builder';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COUNTRY_KEY = 'sc_country';
@@ -100,153 +101,6 @@ const EMPTY_FORM: CheckoutForm = {
   departamento: '',
   notas: '',
 };
-
-// ─── WhatsApp Message Builder ─────────────────────────────────────────────────
-// Uses only safe ASCII + basic emoji codepoints to avoid broken unicode in WhatsApp.
-function buildWhatsAppMessage({
-  numeroOrden,
-  form,
-  cartItems,
-  subtotal,
-  shipping,
-  deliveryMethod,
-  shippingConfig,
-  couponDiscount,
-  couponCode,
-  tax,
-  tipAmount,
-  total,
-  country,
-  paymentMethod,
-  requirePaymentMethod,
-}: {
-  numeroOrden: string;
-  form: CheckoutForm;
-  cartItems: CartItem[];
-  subtotal: number;
-  shipping: number;
-  deliveryMethod: string;
-  shippingConfig: ShippingConfig | null;
-  couponDiscount: number;
-  couponCode: string | null;
-  tax: number;
-  tipAmount: number;
-  total: number;
-  country: Country;
-  paymentMethod: string;
-  requirePaymentMethod: boolean;
-}): string {
-  const currency = country === 'CO' ? 'COP' : 'CRC';
-
-  const fmt = (n: number): string => {
-    const symbol = country === 'CO' ? '$' : '\u20A1';
-    return `${symbol}${Math.round(n).toLocaleString('es-CO')} ${currency}`;
-  };
-
-  // Resolve shipping method name from config
-  const selectedOption = shippingConfig?.options?.find((o) => o.code === deliveryMethod);
-  const shippingMethodName = selectedOption?.name ?? deliveryMethod;
-
-  const paymentLabels: Record<string, string> = {
-    card: 'Tarjeta de credito / debito',
-    nequi: 'Nequi',
-    pse: 'PSE',
-    bancolombia: 'Bancolombia',
-    sinpe_movil: 'SINPE Movil',
-  };
-
-  const countryName = country === 'CO' ? 'Colombia' : 'Costa Rica';
-
-  const lines: string[] = [
-    '----------------------------------------',
-    '  STREET CANDY\'S - NUEVO PEDIDO',
-    '----------------------------------------',
-    '',
-    `Pedido: ${numeroOrden || 'Pendiente'}`,
-    '',
-    '[ CLIENTE ]',
-    `Nombre:   ${form.nombre_completo}`,
-    `Telefono: ${form.telefono}`,
-    `Email:    ${form.email}`,
-    '',
-    '[ ENTREGA ]',
-    `Pais:        ${countryName}`,
-    `Depto/Prov:  ${form.departamento}`,
-    `Ciudad:      ${form.ciudad}`,
-    `Direccion:   ${form.direccion}`,
-  ];
-
-  if (form.notas) {
-    lines.push(`Notas:       ${form.notas}`);
-  }
-
-  lines.push(
-    '',
-    '[ PRODUCTOS ]',
-    '----------------------------------------',
-  );
-
-  if (cartItems.length > 0) {
-    cartItems.forEach((item) => {
-      const unitPrice = parseFloat(item.price.replace(/[^0-9.]/g, ''));
-      const lineTotal = unitPrice * item.qty;
-      lines.push(`* ${item.name}`);
-      lines.push(`  Cantidad:    ${item.qty}`);
-      lines.push(`  Precio unit: ${fmt(unitPrice)}`);
-      lines.push(`  Subtotal:    ${fmt(lineTotal)}`);
-      lines.push('');
-    });
-  } else {
-    lines.push('  (sin productos)');
-    lines.push('');
-  }
-
-  lines.push(
-    '[ RESUMEN ]',
-    '----------------------------------------',
-    `Subtotal:  ${fmt(subtotal)}`,
-    `Envio:     ${shipping === 0 ? 'Gratis' : fmt(shipping)}`,
-    `Metodo:    ${shippingMethodName}`,
-  );
-
-  if (couponCode) {
-    lines.push(`Cupon:     ${couponCode}`);
-    if (couponDiscount > 0) {
-      lines.push(`Descuento: -${fmt(couponDiscount)}`);
-    }
-  }
-
-  if (tipAmount > 0) {
-    lines.push(`Propina:   ${fmt(tipAmount)}`);
-  }
-
-  if (tax > 0) {
-    lines.push(`Impuestos: ${fmt(tax)}`);
-  }
-
-  lines.push(
-    '----------------------------------------',
-    `TOTAL:     ${fmt(total)}`,
-    '',
-    '[ PAGO ]',
-  );
-
-  if (requirePaymentMethod) {
-    lines.push(`Metodo: ${paymentLabels[paymentMethod] ?? paymentMethod}`);
-  } else {
-    lines.push('El pago sera coordinado a traves de esta conversacion de WhatsApp.');
-  }
-
-  lines.push(
-    '',
-    '----------------------------------------',
-    'Gracias por tu pedido en Street Candy\'s!',
-    'El equipo te contactara para confirmar.',
-    '----------------------------------------',
-  );
-
-  return lines.join('\n');
-}
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 function validateForm(form: CheckoutForm): FormErrors {
@@ -1283,29 +1137,43 @@ export default function CheckoutPage() {
       const ordenId: string = data.datos?.orden_id ?? data.datos?.id ?? '';
       const numeroOrden: string = data.datos?.numero_orden ?? '';
 
-      // Build clean WhatsApp message — no broken unicode
-      const waMessage = buildWhatsAppMessage({
-        numeroOrden,
-        form,
-        cartItems,
-        subtotal,
-        shipping,
-        deliveryMethod,
-        shippingConfig,
-        couponDiscount,
-        couponCode: coupon.code,
-        tax,
-        tipAmount,
-        total,
-        country,
-        paymentMethod,
-        requirePaymentMethod,
-      });
-
-      // Resolve phone: use settings if available, otherwise use hardcoded business number
+      // Build WhatsApp message using the shared builder
       const rawPhone = waSettings?.phone?.replace(/\D/g, '') || BUSINESS_WHATSAPP;
       const phoneNumber = rawPhone || BUSINESS_WHATSAPP;
-      const waUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(waMessage)}`;
+
+      const selectedShippingOption = shippingConfig?.options?.find((o) => o.code === deliveryMethod);
+      const shippingMethodName = selectedShippingOption?.name ?? deliveryMethod;
+      const countryName = country === 'CO' ? 'Colombia' : 'Costa Rica';
+
+      const waUrl = buildWhatsAppOrderUrl(phoneNumber, {
+        orderNumber: numeroOrden,
+        orderDate: new Date().toISOString(),
+        customerName: form.nombre_completo,
+        phone: form.telefono,
+        email: form.email,
+        country: countryName,
+        state: form.departamento,
+        city: form.ciudad,
+        address: form.direccion,
+        deliveryMethod: shippingMethodName,
+        shippingCost: shipping,
+        couponCode: coupon.code,
+        discountAmount: couponDiscount,
+        subtotal,
+        tax,
+        tip: tipAmount > 0 ? tipAmount : undefined,
+        total,
+        currency: country === 'CO' ? 'COP' : 'CRC',
+        items: cartItems.map((item) => ({
+          name: item.name,
+          qty: item.qty,
+          price: item.price,
+          unit_price: parseFloat(item.price.replace(/[^0-9.]/g, '')) || 0,
+        })),
+        notes: form.notas || null,
+        paymentMethod: requirePaymentMethod ? paymentMethod : null,
+        requirePaymentMethod,
+      });
 
       // Navigate directly — no window.open('', '_blank') pre-open
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
