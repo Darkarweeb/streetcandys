@@ -174,9 +174,13 @@ export const servicioCheckout = {
     // ── 11. Crear orden ───────────────────────────────────────
     const numeroOrden = generarNumeroOrden(input.codigo_pais);
 
+    // Guest users do not have a real profile UUID.
+    // The orders.profile_id column is UUID (nullable) — pass null for guests.
+    const ordenProfileId = profileId.startsWith('guest-') ? null : profileId;
+
     const orden = await repositorioOrdenes.crear({
       order_number: numeroOrden,
-      profile_id: profileId,
+      profile_id: ordenProfileId,
       country_code: input.codigo_pais,
       shipping_address_id: direccionEnvioId,
       billing_address_id: direccionFacturacionId,
