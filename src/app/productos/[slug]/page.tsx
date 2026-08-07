@@ -10,11 +10,46 @@ export async function generateMetadata({
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://streetcandys.shop';
   const fallbackImage = `${baseUrl}/assets/images/og-image-streetcandys-premium.png`;
 
+  // Skip fetch during build when slug is the literal route placeholder
+  if (!slug || slug === ':slug') {
+    return {
+      title: 'Producto | Street Candys',
+      description: 'Explora nuestro catálogo de premium hemp-derived products.',
+      openGraph: {
+        title: 'Street Candys',
+        description: 'Premium Hemp-Derived Products.',
+        images: [{ url: fallbackImage, width: 1200, height: 630, alt: 'Street Candys — Premium Hemp-Derived Products' }],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        images: [fallbackImage],
+      },
+      robots: { index: false },
+    };
+  }
+
   try {
     const response = await fetch(`${baseUrl}/api/productos/${slug}`, {
       next: { revalidate: 3600 },
     });
-    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        title: 'Producto no encontrado | Street Candys',
+        robots: { index: false },
+      };
+    }
+
+    let data: { datos?: { name?: string; description?: string; images?: { url: string }[]; thumbnail_url?: string; category_name?: string } } = {};
+    try {
+      data = await response.json();
+    } catch {
+      return {
+        title: 'Producto | Street Candys',
+        robots: { index: false },
+      };
+    }
+
     const product = data.datos;
 
     if (!product) {
@@ -40,7 +75,7 @@ export async function generateMetadata({
       metadataBase: new URL(baseUrl),
       title,
       description,
-      keywords: [product.name, 'hemp', 'CBD', 'Street Candys', product.category_name].filter(Boolean),
+      keywords: [product.name, 'hemp', 'CBD', 'Street Candys', product.category_name].filter(Boolean) as string[],
       openGraph: {
         title,
         description,
@@ -48,7 +83,7 @@ export async function generateMetadata({
         locale: 'es_CO',
         siteName: 'Street Candys',
         url: `${baseUrl}/productos/${slug}`,
-        images: [{ url: ogImage, width: 1200, height: 630, alt: product.name }],
+        images: [{ url: ogImage, width: 1200, height: 630, alt: product.name ?? 'Street Candys' }],
       },
       twitter: {
         card: 'summary_large_image',
