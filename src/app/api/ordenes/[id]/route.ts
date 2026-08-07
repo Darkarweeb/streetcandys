@@ -26,8 +26,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
     // Allow access if:
     // 1. Authenticated user who owns the order
     // 2. Authenticated admin/staff
-    // 3. Guest order (profile_id starts with 'guest-') — accessible without auth for confirmation page
-    const esOrdenInvitado = typeof orden.profile_id === 'string' && orden.profile_id.startsWith('guest-');
+    // 3. Guest order (profile_id is null) — accessible without auth for confirmation page
+    const esOrdenInvitado = orden.profile_id === null;
 
     if (!user) {
       // Only allow unauthenticated access for guest orders (order confirmation page)
