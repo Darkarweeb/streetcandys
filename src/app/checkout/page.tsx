@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatPriceValue, FREE_SHIPPING_THRESHOLD, type Country } from '@/lib/price';
+import { formatPriceValue, type Country } from '@/lib/price';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { useWhatsAppSettings } from '@/hooks/useWhatsAppSettings';
@@ -11,34 +11,26 @@ import { useWhatsAppSettings } from '@/hooks/useWhatsAppSettings';
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COUNTRY_KEY = 'sc_country';
 
-const DELIVERY_METHODS = [
-  {
-    id: 'standard',
-    label: 'Envío estándar',
-    description: '3–5 días hábiles',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-        <path d="M2 7h11v8H2V7z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-        <path d="M13 9h3l2 3v3h-5V9z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-        <circle cx="5.5" cy="16.5" r="1.5" stroke="currentColor" strokeWidth="1.4"/>
-        <circle cx="14.5" cy="16.5" r="1.5" stroke="currentColor" strokeWidth="1.4"/>
-      </svg>
-    ),
-    surcharge: 0,
-  },
-  {
-    id: 'express',
-    label: 'Envío express',
-    description: '1–2 días hábiles',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-        <path d="M10 3l1.5 5H17l-4.5 3.3 1.7 5.2L10 13.5l-4.2 3 1.7-5.2L3 8h5.5L10 3z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-      </svg>
-    ),
-    surcharge_co: 8000,
-    surcharge_cr: 2000,
-  },
-];
+// ─── Shipping option type (from dynamic config) ───────────────────────────────
+interface ShippingOption {
+  method_id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  delivery_time: string | null;
+  price: number;
+  is_free: boolean;
+  display_order: number;
+}
+
+interface ShippingConfig {
+  free_shipping_threshold: number;
+  currency_code: string;
+  currency_symbol: string;
+  options: ShippingOption[];
+  same_day_available: boolean;
+  same_day_message: string | null;
+}
 
 const TIP_OPTIONS = [
   { label: 'Sin propina', value: 0 },
@@ -288,37 +280,74 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
-// ─── Delivery Method Section ──────────────────────────────────────────────────
+// ─── Delivery Method Section (Dynamic) ───────────────────────────────────────
+const METHOD_ICONS: Record<string, React.ReactNode> = {
+  standard: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M2 7h11v8H2V7z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+      <path d="M13 9h3l2 3v3h-5V9z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+      <circle cx="5.5" cy="16.5" r="1.5" stroke="currentColor" strokeWidth="1.4"/>
+      <circle cx="14.5" cy="16.5" r="1.5" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+  express: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M10 3l1.5 5H17l-4.5 3.3 1.7 5.2L10 13.5l-4.2 3 1.7-5.2L3 8h5.5L10 3z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+    </svg>
+  ),
+  same_day: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M10 5v5l3 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  ),
+};
+
 function DeliveryMethodSection({
   selected,
   onSelect,
   country,
-  subtotal,
+  shippingConfig,
+  shippingLoading,
 }: {
   selected: string;
-  onSelect: (id: string) => void;
+  onSelect: (code: string) => void;
   country: Country;
-  subtotal: number;
+  shippingConfig: ShippingConfig | null;
+  shippingLoading: boolean;
 }) {
-  const threshold = FREE_SHIPPING_THRESHOLD[country];
-  const baseShippingFree = subtotal >= threshold;
+  if (shippingLoading) {
+    return (
+      <SectionCard title="Método de entrega">
+        <div className="flex items-center gap-3 py-4">
+          <div className="w-5 h-5 border-2 border-sc-forest border-t-transparent rounded-full animate-spin" />
+          <span className="text-sc-muted text-sm">Calculando opciones de envío...</span>
+        </div>
+      </SectionCard>
+    );
+  }
+
+  const options = shippingConfig?.options ?? [];
+
+  if (options.length === 0) {
+    return (
+      <SectionCard title="Método de entrega">
+        <p className="text-sc-muted text-sm">No hay métodos de envío disponibles para tu región.</p>
+      </SectionCard>
+    );
+  }
 
   return (
     <SectionCard title="Método de entrega">
       <div className="space-y-3">
-        {DELIVERY_METHODS.map((method) => {
-          const surcharge =
-            method.id === 'express'
-              ? country === 'CO'
-                ? (method as { surcharge_co: number }).surcharge_co
-                : (method as { surcharge_cr: number }).surcharge_cr
-              : (method as { surcharge: number }).surcharge ?? 0;
-          const isSelected = selected === method.id;
+        {options.map((option) => {
+          const isSelected = selected === option.code;
+          const icon = METHOD_ICONS[option.code] ?? METHOD_ICONS['standard'];
           return (
             <button
-              key={method.id}
+              key={option.code}
               type="button"
-              onClick={() => onSelect(method.id)}
+              onClick={() => onSelect(option.code)}
               className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl border-2 transition-all text-left ${
                 isSelected
                   ? 'border-sc-forest bg-sc-forest/5'
@@ -331,25 +360,17 @@ function DeliveryMethodSection({
                   isSelected ? 'bg-sc-forest text-sc-cream' : 'bg-sc-beige text-sc-forest'
                 }`}
               >
-                {method.icon}
+                {icon}
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sc-forest text-sm font-semibold">{method.label}</p>
-                <p className="text-sc-muted text-xs">{method.description}</p>
+                <p className="text-sc-forest text-sm font-semibold">{option.name}</p>
+                <p className="text-sc-muted text-xs">{option.delivery_time ?? option.description}</p>
               </div>
               <span className="text-sc-forest text-sm font-bold flex-shrink-0">
-                {method.id === 'standard' ? (
-                  baseShippingFree ? (
-                    <span className="text-sc-green">Gratis</span>
-                  ) : (
-                    <span className="text-sc-muted text-xs font-normal">
-                      {formatPriceValue(country === 'CO' ? 12000 : 3500, country)}
-                    </span>
-                  )
-                ) : surcharge === 0 ? (
+                {option.is_free || option.price === 0 ? (
                   <span className="text-sc-green">Gratis</span>
                 ) : (
-                  `+${formatPriceValue(surcharge, country)}`
+                  formatPriceValue(option.price, country)
                 )}
               </span>
               <span
@@ -365,6 +386,15 @@ function DeliveryMethodSection({
           );
         })}
       </div>
+      {shippingConfig?.same_day_message && shippingConfig.same_day_available && (
+        <p className="text-sc-muted text-xs mt-2 flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2"/>
+            <path d="M6 3v3l2 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
+          {shippingConfig.same_day_message}
+        </p>
+      )}
     </SectionCard>
   );
 }
@@ -776,6 +806,10 @@ export default function CheckoutPage() {
   const [mounted, setMounted] = useState(false);
   const [cartLoading, setCartLoading] = useState(true);
 
+  // Dynamic shipping config
+  const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+
   // New checkout-specific state
   const [deliveryMethod, setDeliveryMethod] = useState<string>('standard');
   const [tipRate, setTipRate] = useState<number | 'custom'>(0);
@@ -896,6 +930,27 @@ export default function CheckoutPage() {
     setPaymentMethod('card');
   }, [country]);
 
+  // ── Fetch dynamic shipping config ──────────────────────────────────────────
+  const fetchShippingConfig = useCallback(async (countryCode: string, region: string, sub: number) => {
+    setShippingLoading(true);
+    try {
+      const params = new URLSearchParams({ country: countryCode, subtotal: String(sub) });
+      if (region) params.set('region', region);
+      const res = await fetch(`/api/shipping/calculate?${params.toString()}`);
+      const json = await res.json();
+      if (json.success) {
+        setShippingConfig(json.data);
+        // Auto-select first available method if current selection not available
+        const available = (json.data.options ?? []).map((o: ShippingOption) => o.code);
+        setDeliveryMethod((prev) => available.includes(prev) ? prev : (available[0] ?? 'standard'));
+      }
+    } catch {
+      // fallback: keep existing config
+    } finally {
+      setShippingLoading(false);
+    }
+  }, []);
+
   const handleChange = useCallback((name: keyof CheckoutForm, value: string) => {
     setForm((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: undefined }));
@@ -957,7 +1012,7 @@ export default function CheckoutPage() {
   }, [country]);
 
   // ── Pricing calculations ───────────────────────────────────────────────────
-  const threshold = FREE_SHIPPING_THRESHOLD[country];
+  const threshold = shippingConfig?.free_shipping_threshold ?? (country === 'CO' ? 350000 : 45000);
 
   const subtotal = useMemo(
     () =>
@@ -968,20 +1023,35 @@ export default function CheckoutPage() {
     [cartItems],
   );
 
+  // Fetch shipping config whenever country, region, or subtotal changes
+  useEffect(() => {
+    if (!mounted) return;
+    const region = form.departamento?.trim() || '';
+    fetchShippingConfig(country, region, subtotal);
+  }, [country, form.departamento, subtotal, mounted, fetchShippingConfig]);
+
   const deliverySurcharge = useMemo(() => {
-    if (deliveryMethod !== 'express') return 0;
-    return country === 'CO' ? 8000 : 2000;
-  }, [deliveryMethod, country]);
+    // With dynamic config, the price already includes the full cost per method
+    return 0;
+  }, []);
 
   const shippingFreeViaCoupon = coupon.type === 'shipping';
-  const baseShipping = subtotal >= threshold || shippingFreeViaCoupon ? 0 : country === 'CO' ? 12000 : 3500;
-  const shipping = baseShipping + deliverySurcharge;
+
+  const selectedOption = shippingConfig?.options?.find((o) => o.code === deliveryMethod);
+  const baseShipping = shippingFreeViaCoupon
+    ? 0
+    : selectedOption
+    ? selectedOption.price
+    : (subtotal >= threshold ? 0 : (country === 'CO' ? 12000 : 3500));
+  const shipping = baseShipping;
 
   const couponDiscount = coupon.discount;
 
-  const taxRate = country === 'CO' ? 0.19 : 0.13;
+  const taxRate = shippingConfig
+    ? 0  // tax is handled server-side; keep 0 for display consistency
+    : (country === 'CO' ? 0.19 : 0.13);
   const taxableBase = Math.max(0, subtotal - couponDiscount);
-  const tax = Math.round(taxableBase * taxRate);
+  const tax = Math.round(taxableBase * (country === 'CO' ? 0.19 : 0.13));
 
   const tipAmount = useMemo(() => {
     if (tipRate === 'custom') return parseFloat(customTip.replace(/[^0-9.]/g, '')) || 0;
@@ -1290,7 +1360,8 @@ export default function CheckoutPage() {
                 selected={deliveryMethod}
                 onSelect={setDeliveryMethod}
                 country={country}
-                subtotal={subtotal}
+                shippingConfig={shippingConfig}
+                shippingLoading={shippingLoading}
               />
 
               {/* 5. Tip */}
