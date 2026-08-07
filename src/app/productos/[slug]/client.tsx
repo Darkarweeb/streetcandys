@@ -44,6 +44,8 @@ interface CartItem {
   price: string;
   qty: number;
   image: string;
+  product_id?: string;
+  variant_id?: string | null;
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -218,11 +220,16 @@ export default function ProductDetailPage() {
         const carritoItems = data.datos?.items ?? [];
         const mapped: CartItem[] = carritoItems.map((item: {
           id: string;
+          product_id?: string;
+          variant_id?: string | null;
           producto?: { nombre?: string; thumbnail_url?: string | null };
           precio_unitario: number;
           cantidad: number;
         }) => ({
           id: item.id,
+          // Store product_id and variant_id so checkout can sync to Supabase correctly
+          product_id: item.product_id ?? product.id,
+          variant_id: item.variant_id ?? null,
           name: item.producto?.nombre ?? '',
           price: String(item.precio_unitario),
           qty: item.cantidad,
@@ -281,7 +288,7 @@ export default function ProductDetailPage() {
     <>
       <Navigation cartCount={cartItems.length} onCartOpen={() => setCartOpen(true)} />
       <AnnouncementBar />
-      <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} items={cartItems} country={country} />
+      <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} items={cartItems} />
 
       <main className="min-h-screen bg-sc-cream overflow-x-hidden">
         {/* Breadcrumbs */}

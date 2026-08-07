@@ -10,6 +10,7 @@ import { useWhatsAppSettings } from '@/hooks/useWhatsAppSettings';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COUNTRY_KEY = 'sc_country';
+const BUSINESS_WHATSAPP = '573115397983';
 
 // ─── Shipping option type (from dynamic config) ───────────────────────────────
 interface ShippingOption {
@@ -40,15 +41,15 @@ const TIP_OPTIONS = [
 ];
 
 const PAYMENT_METHODS_CO = [
-  { id: 'card', label: 'Tarjeta de crédito / débito', icon: '💳' },
-  { id: 'nequi', label: 'Nequi', icon: '📱' },
-  { id: 'pse', label: 'PSE', icon: '🏦' },
-  { id: 'bancolombia', label: 'Bancolombia', icon: '🟡' },
+  { id: 'card', label: 'Tarjeta de crédito / débito', icon: 'card' },
+  { id: 'nequi', label: 'Nequi', icon: 'mobile' },
+  { id: 'pse', label: 'PSE', icon: 'bank' },
+  { id: 'bancolombia', label: 'Bancolombia', icon: 'bank' },
 ];
 
 const PAYMENT_METHODS_CR = [
-  { id: 'card', label: 'Tarjeta de crédito / débito', icon: '💳' },
-  { id: 'sinpe_movil', label: 'SINPE Móvil', icon: '📱' },
+  { id: 'card', label: 'Tarjeta de crédito / débito', icon: 'card' },
+  { id: 'sinpe_movil', label: 'SINPE Móvil', icon: 'mobile' },
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -58,6 +59,8 @@ interface CartItem {
   price: string;
   qty: number;
   image: string;
+  product_id?: string;
+  variant_id?: string | null;
 }
 
 interface CheckoutForm {
@@ -98,6 +101,7 @@ const EMPTY_FORM: CheckoutForm = {
 };
 
 // ─── WhatsApp Message Builder ─────────────────────────────────────────────────
+// Uses only safe ASCII + basic emoji codepoints to avoid broken unicode in WhatsApp.
 function buildWhatsAppMessage({
   numeroOrden,
   form,
@@ -105,6 +109,7 @@ function buildWhatsAppMessage({
   subtotal,
   shipping,
   deliveryMethod,
+  shippingConfig,
   couponDiscount,
   couponCode,
   tax,
@@ -119,6 +124,7 @@ function buildWhatsAppMessage({
   subtotal: number;
   shipping: number;
   deliveryMethod: string;
+  shippingConfig: ShippingConfig | null;
   couponDiscount: number;
   couponCode: string | null;
   tax: number;
@@ -130,104 +136,102 @@ function buildWhatsAppMessage({
   const currency = country === 'CO' ? 'COP' : 'CRC';
 
   const fmt = (n: number): string => {
-    try {
-      return n.toLocaleString('es-CO', { style: 'currency', currency, maximumFractionDigits: 0 });
-    } catch {
-      const symbol = country === 'CO' ? '$' : '₡';
-      return `${symbol}${Math.round(n).toLocaleString('es-CO')}`;
-    }
+    const symbol = country === 'CO' ? '$' : '\u20A1';
+    return `${symbol}${Math.round(n).toLocaleString('es-CO')} ${currency}`;
   };
 
-  const methodLabels: Record<string, string> = {
-    standard: 'Envío estándar',
-    express: 'Envío express',
-    same_day: 'Mismo día',
-  };
+  // Resolve shipping method name from config
+  const selectedOption = shippingConfig?.options?.find((o) => o.code === deliveryMethod);
+  const shippingMethodName = selectedOption?.name ?? deliveryMethod;
 
   const paymentLabels: Record<string, string> = {
-    card: 'Tarjeta de crédito / débito',
+    card: 'Tarjeta de credito / debito',
     nequi: 'Nequi',
     pse: 'PSE',
     bancolombia: 'Bancolombia',
-    sinpe_movil: 'SINPE Móvil',
+    sinpe_movil: 'SINPE Movil',
   };
 
+  const countryName = country === 'CO' ? 'Colombia' : 'Costa Rica';
+
   const lines: string[] = [
-    `========================================`,
-    `🛍️  STREET CANDY'S ORDER`,
-    `========================================`,
-    ``,
-    `📋 Orden: ${numeroOrden}`,
-    ``,
-    `📦 PRODUCTOS`,
-    `----------------------------------------`,
+    '----------------------------------------',
+    '  STREET CANDY\'S - NUEVO PEDIDO',
+    '----------------------------------------',
+    '',
+    `Pedido: ${numeroOrden || 'Pendiente'}`,
+    '',
+    '[ CLIENTE ]',
+    `Nombre:   ${form.nombre_completo}`,
+    `Telefono: ${form.telefono}`,
+    `Email:    ${form.email}`,
+    '',
+    '[ ENTREGA ]',
+    `Pais:        ${countryName}`,
+    `Depto/Prov:  ${form.departamento}`,
+    `Ciudad:      ${form.ciudad}`,
+    `Direccion:   ${form.direccion}`,
   ];
+
+  if (form.notas) {
+    lines.push(`Notas:       ${form.notas}`);
+  }
+
+  lines.push(
+    '',
+    '[ PRODUCTOS ]',
+    '----------------------------------------',
+  );
 
   if (cartItems.length > 0) {
     cartItems.forEach((item) => {
       const unitPrice = parseFloat(item.price.replace(/[^0-9.]/g, ''));
       const lineTotal = unitPrice * item.qty;
-      lines.push(`• ${item.name}`);
-      lines.push(`  Cantidad: ${item.qty}  |  Precio unit.: ${fmt(unitPrice)}  |  Total: ${fmt(lineTotal)}`);
+      lines.push(`* ${item.name}`);
+      lines.push(`  Cantidad:    ${item.qty}`);
+      lines.push(`  Precio unit: ${fmt(unitPrice)}`);
+      lines.push(`  Subtotal:    ${fmt(lineTotal)}`);
+      lines.push('');
     });
   } else {
     lines.push('  (sin productos)');
+    lines.push('');
   }
 
   lines.push(
-    ``,
-    `----------------------------------------`,
-    `  Subtotal:         ${fmt(subtotal)}`,
-    `  Método de envío:  ${methodLabels[deliveryMethod] ?? deliveryMethod}`,
-    `  Costo de envío:   ${shipping === 0 ? 'Gratis' : fmt(shipping)}`,
+    '[ RESUMEN ]',
+    '----------------------------------------',
+    `Subtotal:  ${fmt(subtotal)}`,
+    `Envio:     ${shipping === 0 ? 'Gratis' : fmt(shipping)}`,
+    `Metodo:    ${shippingMethodName}`,
   );
 
   if (couponCode) {
-    lines.push(`  Cupón:            ${couponCode}`);
+    lines.push(`Cupon:     ${couponCode}`);
     if (couponDiscount > 0) {
-      lines.push(`  Descuento:        -${fmt(couponDiscount)}`);
+      lines.push(`Descuento: -${fmt(couponDiscount)}`);
     }
   }
 
   if (tipAmount > 0) {
-    lines.push(`  Propina:          ${fmt(tipAmount)}`);
+    lines.push(`Propina:   ${fmt(tipAmount)}`);
   }
 
   if (tax > 0) {
-    lines.push(`  Impuestos:        ${fmt(tax)}`);
+    lines.push(`Impuestos: ${fmt(tax)}`);
   }
 
   lines.push(
-    `  ──────────────────────────────────────`,
-    `  TOTAL:            ${fmt(total)}`,
-    ``,
-    `----------------------------------------`,
-    `👤 CLIENTE`,
-    `----------------------------------------`,
-    `  Nombre:           ${form.nombre_completo}`,
-    `  Teléfono:         ${form.telefono}`,
-    `  Email:            ${form.email}`,
-    `  País:             ${country === 'CO' ? '🇨🇴 Colombia' : '🇨🇷 Costa Rica'}`,
-    `  Depto/Provincia:  ${form.departamento}`,
-    `  Ciudad:           ${form.ciudad}`,
-    `  Dirección:        ${form.direccion}`,
-  );
-
-  if (form.notas) {
-    lines.push(`  Instrucciones:    ${form.notas}`);
-  }
-
-  lines.push(
-    ``,
-    `----------------------------------------`,
-    `💳 MÉTODO DE PAGO`,
-    `----------------------------------------`,
-    `  ${paymentLabels[paymentMethod] ?? paymentMethod}`,
-    ``,
-    `========================================`,
-    `¡Gracias por tu pedido en Street Candy's! 🍬`,
-    `Te contactaremos pronto para confirmar tu entrega.`,
-    `========================================`,
+    '----------------------------------------',
+    `TOTAL:     ${fmt(total)}`,
+    '',
+    '[ PAGO ]',
+    `Metodo: ${paymentLabels[paymentMethod] ?? paymentMethod}`,
+    '',
+    '----------------------------------------',
+    'Gracias por tu pedido en Street Candy\'s!',
+    'El equipo te contactara para confirmar.',
+    '----------------------------------------',
   );
 
   return lines.join('\n');
@@ -277,7 +281,6 @@ function InputField({
   placeholder?: string;
   required?: boolean;
 }) {
-  // Map input type to appropriate inputMode for mobile keyboards
   const inputModeMap: Record<string, React.HTMLAttributes<HTMLInputElement>['inputMode']> = {
     email: 'email',
     tel: 'tel',
@@ -476,7 +479,7 @@ function TipSection({
 
   return (
     <SectionCard title="Propina para el repartidor">
-      <p className="text-sc-muted text-xs -mt-2">100% va al repartidor. ¡Gracias por tu apoyo!</p>
+      <p className="text-sc-muted text-xs -mt-2">100% va al repartidor.</p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {TIP_OPTIONS.map((opt) => {
           const isSelected = tipRate === opt.value && tipRate !== 'custom';
@@ -639,7 +642,6 @@ function PaymentMethodSection({
               }`}
               aria-pressed={isSelected}
             >
-              <span className="text-xl flex-shrink-0" aria-hidden="true">{method.icon}</span>
               <span className="flex-1 text-sc-forest text-sm font-semibold">{method.label}</span>
               <span
                 className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
@@ -766,7 +768,7 @@ function OrderSummary({
           <div className="flex justify-between text-sm">
             <span className="text-sc-muted">Envío</span>
             {shipping === 0 ? (
-              <span className="text-sc-green font-semibold">Gratis 🎉</span>
+              <span className="text-sc-green font-semibold">Gratis</span>
             ) : (
               <span className="text-sc-forest font-semibold">{formatPriceValue(shipping, country)}</span>
             )}
@@ -864,7 +866,7 @@ export default function CheckoutPage() {
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
 
-  // New checkout-specific state
+  // Checkout-specific state
   const [deliveryMethod, setDeliveryMethod] = useState<string>('standard');
   const [tipRate, setTipRate] = useState<number | 'custom'>(0);
   const [customTip, setCustomTip] = useState<string>('');
@@ -885,6 +887,9 @@ export default function CheckoutPage() {
   }, []);
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
+  // ARCHITECTURE: One single bootstrap. Resolves ONE cart ID. All subsequent
+  // operations (coupon, submit, WhatsApp) use this exact carritoId.
+  // No second lookups. No fallback cart creation.
   useEffect(() => {
     setMounted(true);
     const storedCountry = localStorage.getItem(COUNTRY_KEY) as Country | null;
@@ -894,45 +899,80 @@ export default function CheckoutPage() {
 
     (async () => {
       try {
-        // ── Read items from localStorage snapshot (same source as CartDrawer) ──
-        const snapshot = (() => {
-          try {
-            const raw = localStorage.getItem('sc_cart_snapshot');
-            if (!raw) return null;
-            return JSON.parse(raw) as { items?: Array<{ id: string; name: string; price: string; qty: number; image: string }> };
-          } catch { return null; }
-        })();
-
-        const snapshotItems = snapshot?.items ?? [];
-
-        if (snapshotItems.length > 0) {
-          setCartItems(snapshotItems.map((item) => ({
-            id: item.id,
-            name: item.name ?? '',
-            price: item.price ?? '',
-            qty: item.qty ?? 1,
-            image: item.image ?? '',
-          })));
-        }
-
-        // ── Fetch API for carritoId and coupon ──
         const sessionId = localStorage.getItem('sc_guest_session_id') ?? undefined;
+
+        // Step 1: Fetch the canonical cart from Supabase.
+        // This is the ONLY cart resolution in the entire checkout flow.
         const res = await fetch(`/api/carrito?pais=${activeCountry}`, {
           headers: sessionId ? { 'x-session-id': sessionId } : {},
         });
         const data = await res.json();
-        if (data.exito && data.datos) {
-          const cartData = data.datos;
-          const resolvedCarritoId: string = cartData.id ?? null;
-          setCarritoId(resolvedCarritoId);
 
-          const apiItems: unknown[] = cartData.items ?? [];
+        if (!data.exito || !data.datos) {
+          setCartLoading(false);
+          return;
+        }
 
-          // ── Sync localStorage items into Supabase cart if API cart is empty ──
-          // This happens when items were added from the homepage (localStorage only)
-          if (snapshotItems.length > 0 && apiItems.length === 0 && resolvedCarritoId && sessionId) {
-            // Push each snapshot item into the Supabase cart
-            await Promise.allSettled(
+        const cartData = data.datos;
+        const resolvedCarritoId: string = cartData.id;
+        setCarritoId(resolvedCarritoId);
+
+        // Step 2: Determine items.
+        // API items are the source of truth if they exist.
+        // If the Supabase cart is empty, sync from localStorage snapshot.
+        const apiItems: Array<{
+          id: string;
+          product_id?: string;
+          variant_id?: string | null;
+          nombre?: string;
+          name?: string;
+          precio_unitario?: number;
+          price?: string;
+          cantidad?: number;
+          qty?: number;
+          imagen_url?: string;
+          image?: string;
+          producto?: { nombre?: string; thumbnail_url?: string | null };
+        }> = cartData.items ?? [];
+
+        if (apiItems.length > 0) {
+          // Supabase cart has items — use them directly
+          const items: CartItem[] = apiItems.map((item) => ({
+            id: item.id,
+            product_id: item.product_id ?? item.id,
+            variant_id: item.variant_id ?? null,
+            name: item.producto?.nombre ?? item.nombre ?? item.name ?? '',
+            price: item.price ?? formatPriceValue(item.precio_unitario ?? 0, activeCountry),
+            qty: item.cantidad ?? item.qty ?? 1,
+            image: item.imagen_url ?? item.producto?.thumbnail_url ?? item.image ?? '',
+          }));
+          setCartItems(items);
+        } else {
+          // Supabase cart is empty — try to sync from localStorage snapshot
+          const snapshot = (() => {
+            try {
+              const raw = localStorage.getItem('sc_cart_snapshot');
+              if (!raw) return null;
+              return JSON.parse(raw) as {
+                items?: Array<{
+                  id: string;
+                  product_id?: string;
+                  variant_id?: string | null;
+                  name: string;
+                  price: string;
+                  qty: number;
+                  image: string;
+                }>;
+              };
+            } catch { return null; }
+          })();
+
+          const snapshotItems = snapshot?.items ?? [];
+
+          if (snapshotItems.length > 0 && sessionId) {
+            // Sync snapshot items into the canonical Supabase cart.
+            // CRITICAL: use item.product_id (not item.id which is the cart_item UUID).
+            const syncResults = await Promise.allSettled(
               snapshotItems.map((item) =>
                 fetch('/api/carrito/items', {
                   method: 'POST',
@@ -941,48 +981,57 @@ export default function CheckoutPage() {
                     'x-session-id': sessionId,
                   },
                   body: JSON.stringify({
-                    producto_id: item.id,
+                    producto_id: item.product_id ?? item.id,
+                    variante_id: item.variant_id ?? undefined,
                     cantidad: item.qty,
                     pais: activeCountry,
                   }),
                 }),
               ),
             );
-          }
 
-          // Only use API items if localStorage snapshot was empty
-          if (snapshotItems.length === 0) {
-            const items: CartItem[] = (apiItems as Array<{
-              id: string;
-              producto_id?: string;
-              nombre?: string;
-              name?: string;
-              precio?: number;
-              price?: string;
-              cantidad?: number;
-              qty?: number;
-              imagen_url?: string;
-              image?: string;
-            }>).map((item) => ({
-              id: item.producto_id ?? item.id,
-              name: item.nombre ?? item.name ?? '',
-              price: item.price ?? formatPriceValue(item.precio ?? 0, activeCountry),
-              qty: item.cantidad ?? item.qty ?? 1,
-              image: item.imagen_url ?? item.image ?? '',
-            }));
-            setCartItems(items);
-          }
-
-          const cupon = cartData.cupon ?? null;
-          if (cupon) {
-            setCoupon({
-              code: cupon.codigo ?? null,
-              type: cupon.tipo_descuento ?? null,
-              discount: cupon.descuento_calculado ?? 0,
-              loading: false,
-              error: null,
+            // After sync, re-fetch the cart to get the canonical items with correct IDs
+            const syncedRes = await fetch(`/api/carrito?pais=${activeCountry}`, {
+              headers: { 'x-session-id': sessionId },
             });
+            const syncedData = await syncedRes.json();
+
+            if (syncedData.exito && syncedData.datos?.items?.length > 0) {
+              const syncedItems: CartItem[] = (syncedData.datos.items as typeof apiItems).map((item) => ({
+                id: item.id,
+                product_id: item.product_id ?? item.id,
+                variant_id: item.variant_id ?? null,
+                name: item.produto?.nombre ?? item.nombre ?? item.name ?? '',
+                price: item.price ?? formatPriceValue(item.precio_unitario ?? 0, activeCountry),
+                qty: item.cantidad ?? item.qty ?? 1,
+                image: item.imagen_url ?? item.produto?.thumbnail_url ?? item.image ?? '',
+              }));
+              setCartItems(syncedItems);
+            } else {
+              // Sync failed or items not in Supabase — show snapshot items for display
+              setCartItems(snapshotItems.map((item) => ({
+                id: item.id,
+                product_id: item.product_id ?? item.id,
+                variant_id: item.variant_id ?? null,
+                name: item.name ?? '',
+                price: item.price ?? '',
+                qty: item.qty ?? 1,
+                image: item.image ?? '',
+              })));
+            }
           }
+        }
+
+        // Step 3: Restore coupon if already applied to this cart
+        const cupon = cartData.cupon ?? null;
+        if (cupon) {
+          setCoupon({
+            code: cupon.codigo ?? null,
+            type: cupon.tipo_descuento ?? null,
+            discount: cupon.descuento_calculado ?? 0,
+            loading: false,
+            error: null,
+          });
         }
       } catch {
         // cart fetch failed — leave empty
@@ -990,6 +1039,7 @@ export default function CheckoutPage() {
         setCartLoading(false);
       }
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Pre-fill form from profile
@@ -1012,6 +1062,8 @@ export default function CheckoutPage() {
   }, [country]);
 
   // ── Fetch dynamic shipping config ──────────────────────────────────────────
+  // Loads ALL active shipping methods from Shipping Management, sorted by display_order.
+  // Filtered only by country and enabled — nothing hardcoded.
   const fetchShippingConfig = useCallback(async (countryCode: string, region: string, sub: number) => {
     setShippingLoading(true);
     try {
@@ -1038,9 +1090,10 @@ export default function CheckoutPage() {
   }, []);
 
   // ── Coupon handlers ────────────────────────────────────────────────────────
+  // ARCHITECTURE: Always uses the carritoId resolved during bootstrap.
+  // Never re-resolves the cart. Never creates a new cart.
   const handleApplyCoupon = useCallback(async () => {
     if (!couponInput.trim()) return;
-    // Always use the already-loaded carritoId — never re-resolve
     if (!carritoId) {
       setCoupon((prev) => ({ ...prev, loading: false, error: 'El carrito no está listo. Recarga la página.' }));
       return;
@@ -1062,7 +1115,7 @@ export default function CheckoutPage() {
       });
       const data = await res.json();
       if (!data.exito) {
-        setCoupon((prev) => ({ ...prev, loading: false, error: data.error ?? `Cupón inválido: ${formatPriceValue(0, country)}` }));
+        setCoupon((prev) => ({ ...prev, loading: false, error: data.error ?? 'Cupón inválido' }));
         return;
       }
       const cupon = data.datos?.cupon ?? null;
@@ -1115,10 +1168,7 @@ export default function CheckoutPage() {
     fetchShippingConfig(country, region, subtotal);
   }, [country, form.departamento, subtotal, mounted, fetchShippingConfig]);
 
-  const deliverySurcharge = useMemo(() => {
-    // With dynamic config, the price already includes the full cost per method
-    return 0;
-  }, []);
+  const deliverySurcharge = 0;
 
   const shippingFreeViaCoupon = coupon.type === 'shipping';
 
@@ -1132,11 +1182,7 @@ export default function CheckoutPage() {
 
   const couponDiscount = coupon.discount;
 
-  const taxRate = shippingConfig
-    ? 0  // tax is handled server-side; keep 0 for display consistency
-    : (country === 'CO' ? 0.19 : 0.13);
-  const taxableBase = Math.max(0, subtotal - couponDiscount);
-  const tax = Math.round(taxableBase * (country === 'CO' ? 0.19 : 0.13));
+  const tax = Math.round(Math.max(0, subtotal - couponDiscount) * (country === 'CO' ? 0.19 : 0.13));
 
   const tipAmount = useMemo(() => {
     if (tipRate === 'custom') return parseFloat(customTip.replace(/[^0-9.]/g, '')) || 0;
@@ -1147,6 +1193,9 @@ export default function CheckoutPage() {
   const totalQty = cartItems.reduce((s, i) => s + i.qty, 0);
 
   // ── Submit ─────────────────────────────────────────────────────────────────
+  // ARCHITECTURE: Uses carritoId resolved during bootstrap. No re-resolution.
+  // Colombia → creates order → redirects to /orden-confirmada
+  // Costa Rica → creates order → opens WhatsApp → redirects to /orden-confirmada
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
@@ -1171,7 +1220,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Guard: carritoId must already be loaded — never re-resolve
+    // The carritoId MUST already be loaded from bootstrap — never re-resolve
     if (!carritoId) {
       setSubmitError('El carrito no está listo. Recarga la página e intenta de nuevo.');
       return;
@@ -1216,7 +1265,7 @@ export default function CheckoutPage() {
       const numeroOrden: string = data.datos?.numero_orden ?? '';
 
       if (country === 'CR') {
-        // Build WhatsApp message from existing checkout state
+        // Build clean WhatsApp message — no broken unicode
         const waMessage = buildWhatsAppMessage({
           numeroOrden,
           form,
@@ -1224,6 +1273,7 @@ export default function CheckoutPage() {
           subtotal,
           shipping,
           deliveryMethod,
+          shippingConfig,
           couponDiscount,
           couponCode: coupon.code,
           tax,
@@ -1233,9 +1283,9 @@ export default function CheckoutPage() {
           paymentMethod,
         });
 
-        // Use hardcoded business number (573115397983) as primary, fall back to settings
-        const rawPhone = waSettings?.phone?.replace(/\D/g, '') || '573115397983';
-        const phoneNumber = rawPhone || '573115397983';
+        // Resolve phone: use settings if available, otherwise use hardcoded business number
+        const rawPhone = waSettings?.phone?.replace(/\D/g, '') || BUSINESS_WHATSAPP;
+        const phoneNumber = rawPhone || BUSINESS_WHATSAPP;
         const waUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(waMessage)}`;
 
         // Navigate directly — no window.open('', '_blank') pre-open
@@ -1409,14 +1459,14 @@ export default function CheckoutPage() {
                     id="notas"
                     value={form.notas}
                     onChange={(e) => handleChange('notas', e.target.value)}
-                    placeholder="Ej: Timbre no funciona, llamar al llegar. Dejar en portería si no hay nadie."
+                    placeholder="Ej: Timbre no funciona, llamar al llegar."
                     rows={3}
                     className="w-full px-4 py-3 rounded-xl border border-sc-beige text-sc-forest text-sm bg-white placeholder-sc-muted focus:outline-none focus:ring-2 focus:ring-sc-forest/20 focus:border-sc-forest transition-all resize-none"
                   />
                 </div>
               </SectionCard>
 
-              {/* 4. Delivery method */}
+              {/* 4. Delivery method — loaded from Shipping Management, all active methods */}
               <DeliveryMethodSection
                 selected={deliveryMethod}
                 onSelect={setDeliveryMethod}
@@ -1472,7 +1522,7 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {/* Submit */}
+              {/* Submit button — Colombia: "Confirmar pedido" | Costa Rica: "Completar pedido por WhatsApp" */}
               <button
                 type="submit"
                 disabled={submitting || (country === 'CR' && waSettingsLoading)}
@@ -1488,7 +1538,7 @@ export default function CheckoutPage() {
                   </>
                 ) : country === 'CR' ? (
                   <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="flex-shrink-0" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="flex-shrink-0" aria-hidden="true">
                       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                     </svg>
                     Completar pedido por WhatsApp
@@ -1509,7 +1559,7 @@ export default function CheckoutPage() {
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                 </svg>
                 <p className="text-green-800 text-xs leading-relaxed">
-                  <strong>Confirmación por WhatsApp:</strong> Después de confirmar, el equipo de Street Candy&apos;s se comunicará contigo por WhatsApp para coordinar el pago y la entrega.
+                  <strong>Confirmación por WhatsApp:</strong> El equipo de Street Candy&apos;s se comunicará contigo para coordinar el pago y la entrega.
                 </p>
               </div>
 
