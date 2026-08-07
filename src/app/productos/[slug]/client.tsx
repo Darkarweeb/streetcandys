@@ -189,15 +189,29 @@ export default function ProductDetailPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          product_id: product.id,
-          quantity,
-          ...(selectedVariantId ? { variant_id: selectedVariantId } : {}),
+          producto_id: product.id,
+          cantidad: quantity,
+          pais: country,
+          ...(selectedVariantId ? { variante_id: selectedVariantId } : {}),
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setCartItems(data.items || []);
+        const carritoItems = data.datos?.items ?? [];
+        const mapped: CartItem[] = carritoItems.map((item: {
+          id: string;
+          producto?: { nombre?: string; thumbnail_url?: string | null };
+          precio_unitario: number;
+          cantidad: number;
+        }) => ({
+          id: item.id,
+          name: item.producto?.nombre ?? '',
+          price: String(item.precio_unitario),
+          qty: item.cantidad,
+          image: item.producto?.thumbnail_url ?? '',
+        }));
+        setCartItems(mapped);
         setCartOpen(true);
         setQuantity(1);
       }

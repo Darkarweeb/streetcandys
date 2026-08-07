@@ -8,18 +8,18 @@
  */
 
 // Repositorios
-export type { productoRepositorio, varianteRepositorio, inventarioRepositorio } from './product-repository';
-export type { categoriaRepositorio } from './category-repository';
-export type { resenasRepositorio } from './reviews-repository';
+export { productoRepositorio, varianteRepositorio, inventarioRepositorio } from './product-repository';
+export { categoriaRepositorio } from './category-repository';
+export { resenasRepositorio } from './reviews-repository';
 
 // Servicios
-export type { productoServicio } from './product-service';
-export type { categoriaServicio } from './category-service';
-export type { resenasServicio } from './reviews-service';
-export type { inventarioServicio } from './inventory-service';
+export { productoServicio } from './product-service';
+export { categoriaServicio } from './category-service';
+export { resenasServicio } from './reviews-service';
+export { inventarioServicio } from './inventory-service';
 
 // Utilidades
-export type {
+export {
   normalizarPaginacion,
   construirPaginacion,
   resolverOrdenamiento,
