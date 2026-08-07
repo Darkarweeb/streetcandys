@@ -41,9 +41,8 @@ export function calcularEnvio(
   subtotal: number,
 ): number {
   const config = obtenerConfigPais(codigoPais);
-  if (subtotal >= config.envio_gratis_desde) return 0;
   const pesoKg = pesoGramos / 1000;
-  return config.costo_envio_base + pesoKg * config.costo_envio_por_kg;
+  return Math.round(config.costo_envio_base + pesoKg * config.costo_envio_por_kg);
 }
 
 export function calcularTotal(

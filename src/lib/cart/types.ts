@@ -124,7 +124,6 @@ export interface ResumenCarrito {
   total: number;
   moneda: string;
   simbolo_moneda: string;
-  envio_gratis: boolean;
   peso_total_gramos: number;
 }
 
@@ -154,7 +153,6 @@ export interface ConfiguracionPais {
   moneda: string;
   simbolo_moneda: string;
   tasa_impuesto: number;
-  envio_gratis_desde: number;
   costo_envio_base: number;
   costo_envio_por_kg: number;
   metodos_pago: string[];
@@ -167,7 +165,6 @@ export const CONFIGURACION_PAISES: Record<string, ConfiguracionPais> = {
     moneda: 'COP',
     simbolo_moneda: '$',
     tasa_impuesto: 0.19,
-    envio_gratis_desde: 150000,
     costo_envio_base: 12000,
     costo_envio_por_kg: 3000,
     metodos_pago: ['pse', 'nequi', 'bancolombia', 'stripe'],
@@ -178,7 +175,6 @@ export const CONFIGURACION_PAISES: Record<string, ConfiguracionPais> = {
     moneda: 'CRC',
     simbolo_moneda: '₡',
     tasa_impuesto: 0.13,
-    envio_gratis_desde: 75000,
     costo_envio_base: 3500,
     costo_envio_por_kg: 1500,
     metodos_pago: ['sinpe_movil', 'stripe'],
@@ -242,8 +238,6 @@ export interface RespuestaApi<T = unknown> {
 export interface EstimacionEnvio {
   codigo_pais: string;
   costo_envio: number;
-  envio_gratis: boolean;
-  monto_para_envio_gratis: number;
   moneda: string;
   simbolo_moneda: string;
   tiempo_estimado: string;

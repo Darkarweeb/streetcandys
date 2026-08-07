@@ -78,22 +78,15 @@ export function estimarEnvio(
   pesoTotalGramos: number = 0,
 ): EstimacionEnvio {
   const config = obtenerConfigPais(codigoPais);
-  const envioGratis = subtotal >= config.envio_gratis_desde;
 
-  let costoEnvio = 0;
-  if (!envioGratis) {
-    const pesoKg = pesoTotalGramos / 1000;
-    costoEnvio = config.costo_envio_base + pesoKg * config.costo_envio_por_kg;
-    costoEnvio = Math.round(costoEnvio);
-  }
+  const pesoKg = pesoTotalGramos / 1000;
+  const costoEnvio = Math.round(config.costo_envio_base + pesoKg * config.costo_envio_por_kg);
 
-  const tiempoEstimado = codigoPais === 'CO' ?'3-5 días hábiles' :'5-7 días hábiles';
+  const tiempoEstimado = codigoPais === 'CO' ? '3-5 días hábiles' : '5-7 días hábiles';
 
   return {
     codigo_pais: codigoPais,
     costo_envio: costoEnvio,
-    envio_gratis: envioGratis,
-    monto_para_envio_gratis: Math.max(0, config.envio_gratis_desde - subtotal),
     moneda: config.moneda,
     simbolo_moneda: config.simbolo_moneda,
     tiempo_estimado: tiempoEstimado,
@@ -208,11 +201,8 @@ export function construirResumenCarrito(
   const descuentoRecompensas = infoRecompensas?.descuento_recompensas ?? 0;
   const subtotalConDescuentos = Math.max(0, subtotal - descuentoCupon - descuentoRecompensas);
 
-  // Envío — forzar gratis si el cupón es de tipo 'shipping'
-  const cuponEsEnvioGratis = cuponAplicado?.tipo_descuento === 'shipping';
-  const envioInfo = cuponEsEnvioGratis
-    ? { ...estimarEnvio(codigoPais, subtotalConDescuentos, pesoTotal), costo_envio: 0, envio_gratis: true }
-    : estimarEnvio(codigoPais, subtotalConDescuentos, pesoTotal);
+  // Envío — siempre se cobra
+  const envioInfo = estimarEnvio(codigoPais, subtotalConDescuentos, pesoTotal);
 
   // Impuesto (sobre subtotal con descuentos + envío)
   const baseImpuesto = subtotalConDescuentos + envioInfo.costo_envio;
@@ -232,7 +222,6 @@ export function construirResumenCarrito(
     total,
     moneda: config.moneda,
     simbolo_moneda: config.simbolo_moneda,
-    envio_gratis: envioInfo.envio_gratis,
     peso_total_gramos: pesoTotal,
   };
 }
