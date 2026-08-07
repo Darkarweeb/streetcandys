@@ -186,12 +186,21 @@ export const repositorioOrdenes = {
 
   /**
    * Crea una dirección y retorna su ID
+   * Para pedidos de invitados (profileId comienza con "guest-"), no se inserta en la tabla
+   * addresses (que requiere un UUID real de profiles). Retorna null en ese caso.
    */
   async crearDireccion(
     profileId: string,
     dir: InputDireccion,
     esDefault = false,
-  ): Promise<string> {
+  ): Promise<string | null> {
+    // Guest checkouts do not have a real profile UUID — skip the DB insert
+    // to avoid "invalid input syntax for type uuid" errors.
+    // Address data is preserved in the order metadata instead.
+    if (profileId.startsWith('guest-')) {
+      return null;
+    }
+
     const supabase = await createClient();
     const { data, error } = await supabase
       .from('addresses')

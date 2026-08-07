@@ -163,7 +163,7 @@ export const servicioCheckout = {
       input.direccion_envio,
     );
 
-    let direccionFacturacionId = direccionEnvioId;
+    let direccionFacturacionId: string | null = direccionEnvioId;
     if (input.direccion_facturacion) {
       direccionFacturacionId = await repositorioOrdenes.crearDireccion(
         profileId,
