@@ -38,18 +38,6 @@ const DELIVERY_METHODS = [
     surcharge_co: 8000,
     surcharge_cr: 2000,
   },
-  {
-    id: 'pickup',
-    label: 'Recoger en tienda',
-    description: 'Disponible hoy',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-        <path d="M10 2C7.24 2 5 4.24 5 7c0 3.75 5 11 5 11s5-7.25 5-11c0-2.76-2.24-5-5-5z" stroke="currentColor" strokeWidth="1.4"/>
-        <circle cx="10" cy="7" r="2" stroke="currentColor" strokeWidth="1.4"/>
-      </svg>
-    ),
-    surcharge: 0,
-  },
 ];
 
 const TIP_OPTIONS = [
