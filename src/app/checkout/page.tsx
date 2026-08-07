@@ -1268,37 +1268,35 @@ export default function CheckoutPage() {
       const ordenId: string = data.datos?.orden_id ?? data.datos?.id ?? '';
       const numeroOrden: string = data.datos?.numero_orden ?? '';
 
-      if (country === 'CR') {
-        // Build clean WhatsApp message — no broken unicode
-        const waMessage = buildWhatsAppMessage({
-          numeroOrden,
-          form,
-          cartItems,
-          subtotal,
-          shipping,
-          deliveryMethod,
-          shippingConfig,
-          couponDiscount,
-          couponCode: coupon.code,
-          tax,
-          tipAmount,
-          total,
-          country,
-          paymentMethod,
-        });
+      // Build clean WhatsApp message — no broken unicode
+      const waMessage = buildWhatsAppMessage({
+        numeroOrden,
+        form,
+        cartItems,
+        subtotal,
+        shipping,
+        deliveryMethod,
+        shippingConfig,
+        couponDiscount,
+        couponCode: coupon.code,
+        tax,
+        tipAmount,
+        total,
+        country,
+        paymentMethod,
+      });
 
-        // Resolve phone: use settings if available, otherwise use hardcoded business number
-        const rawPhone = waSettings?.phone?.replace(/\D/g, '') || BUSINESS_WHATSAPP;
-        const phoneNumber = rawPhone || BUSINESS_WHATSAPP;
-        const waUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(waMessage)}`;
+      // Resolve phone: use settings if available, otherwise use hardcoded business number
+      const rawPhone = waSettings?.phone?.replace(/\D/g, '') || BUSINESS_WHATSAPP;
+      const phoneNumber = rawPhone || BUSINESS_WHATSAPP;
+      const waUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(waMessage)}`;
 
-        // Navigate directly — no window.open('', '_blank') pre-open
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        if (isMobile) {
-          window.location.href = waUrl;
-        } else {
-          window.open(waUrl, '_blank', 'noopener,noreferrer');
-        }
+      // Navigate directly — no window.open('', '_blank') pre-open
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile) {
+        window.location.href = waUrl;
+      } else {
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
       }
 
       router.push(`/orden-confirmada/${ordenId}?numero=${encodeURIComponent(numeroOrden)}`);

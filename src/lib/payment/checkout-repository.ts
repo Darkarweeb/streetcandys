@@ -3,7 +3,7 @@
  * Acceso a datos para el proceso de checkout: carrito, inventario, cupones, recompensas.
  */
 
-import { createClient } from '../supabase/server';
+import { createAdminClient } from '../supabase/admin';
 import type { DbCart, DbCartItem } from '../cart/types';
 import { loggerPagos } from '../payment/logger';
 
@@ -42,7 +42,7 @@ export const repositorioCheckout = {
       } | null;
     }>;
   } | null> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
 
     const { data: carrito, error: errorCarrito } = await supabase
       .from('cart')
@@ -104,7 +104,7 @@ export const repositorioCheckout = {
     maximum_discount: number | null;
     description: string | null;
   } | null> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
 
     const { data } = await supabase
       .from('cart')
@@ -129,7 +129,7 @@ export const repositorioCheckout = {
    * Obtiene los puntos de recompensa a usar desde metadata del carrito
    */
   async obtenerPuntosRecompensaCarrito(carritoId: string): Promise<number> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const { data } = await supabase
       .from('cart')
       .select('metadata')
@@ -146,7 +146,7 @@ export const repositorioCheckout = {
   async deducirInventario(
     items: { producto_id: string; variante_id: string | null; cantidad: number }[],
   ): Promise<void> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
 
     for (const item of items) {
       let query = supabase
@@ -181,7 +181,7 @@ export const repositorioCheckout = {
     ordenId: string,
     descuentoAplicado: number,
   ): Promise<void> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
 
     // Insertar redención
     await supabase.from('coupon_redemptions').insert({
@@ -205,7 +205,7 @@ export const repositorioCheckout = {
     tipo: 'earned_purchase' | 'redeemed',
     descripcion: string,
   ): Promise<void> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
 
     // Obtener balance actual
     const { data: rewards } = await supabase
@@ -251,7 +251,7 @@ export const repositorioCheckout = {
    * Vacía el carrito después de crear la orden
    */
   async vaciarCarrito(carritoId: string): Promise<void> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     await supabase.from('cart_items').delete().eq('cart_id', carritoId);
     await supabase
       .from('cart')
@@ -273,7 +273,7 @@ export const repositorioCheckout = {
     cuerpo: string,
     datos: Record<string, unknown> = {},
   ): Promise<void> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     await supabase.from('notifications').insert({
       profile_id: profileId,
       notification_type: tipo,
@@ -288,7 +288,7 @@ export const repositorioCheckout = {
    * Returns true if the coupon is still valid.
    */
   async validarCuponActivo(cuponId: string): Promise<boolean> {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const { data } = await supabase
       .from('coupons')
       .select('is_active, expires_at, usage_limit, usage_count')
