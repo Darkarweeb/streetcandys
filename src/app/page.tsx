@@ -1,4 +1,4 @@
-// cache-bust-6
+// cache-bust-7
 'use client';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
@@ -719,6 +719,7 @@ function EffectsExplorer({
       id="efectos"
       className="py-20 lg:py-32 bg-sc-beige overflow-hidden"
       aria-labelledby="efectos-title"
+      suppressHydrationWarning
     >
       <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
         {/* Section Header */}
@@ -1790,7 +1791,7 @@ export default function HomePage() {
           onCountryChange={handleCountryChange}
         />
 
-        <main id="main-content">
+        <main id="main-content" suppressHydrationWarning>
           {/* 1. Hero */}
           <HeroSection country={country} onShopNow={scrollToFeatured} />
 
