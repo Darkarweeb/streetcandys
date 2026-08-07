@@ -14,6 +14,17 @@ import { formatPriceValue, type Country } from '@/lib/price';
 import ProductReviewsSection from '@/components/ProductReviewsSection';
 
 const COUNTRY_KEY = 'sc_country';
+const SESSION_KEY = 'sc_session_id';
+
+function getOrCreateSessionId(): string {
+  if (typeof window === 'undefined') return '';
+  let sid = localStorage.getItem(SESSION_KEY);
+  if (!sid) {
+    sid = crypto.randomUUID();
+    localStorage.setItem(SESSION_KEY, sid);
+  }
+  return sid;
+}
 
 const Footer = dynamic(() => import('@/components/Footer'), {
   loading: () => <div className="bg-sc-darkforest h-64 animate-pulse" aria-hidden="true" />,
@@ -185,9 +196,13 @@ export default function ProductDetailPage() {
     if (!product) return;
 
     try {
+      const sessionId = getOrCreateSessionId();
       const response = await fetch('/api/carrito/items', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-id': sessionId,
+        },
         body: JSON.stringify({
           producto_id: product.id,
           cantidad: quantity,
