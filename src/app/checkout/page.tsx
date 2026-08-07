@@ -7,6 +7,7 @@ import { formatPriceValue, type Country } from '@/lib/price';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { useWhatsAppSettings } from '@/hooks/useWhatsAppSettings';
+import { useCheckoutSettings } from '@/hooks/useCheckoutSettings';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COUNTRY_KEY = 'sc_country';
@@ -117,6 +118,7 @@ function buildWhatsAppMessage({
   total,
   country,
   paymentMethod,
+  requirePaymentMethod,
 }: {
   numeroOrden: string;
   form: CheckoutForm;
@@ -132,6 +134,7 @@ function buildWhatsAppMessage({
   total: number;
   country: Country;
   paymentMethod: string;
+  requirePaymentMethod: boolean;
 }): string {
   const currency = country === 'CO' ? 'COP' : 'CRC';
 
@@ -226,7 +229,15 @@ function buildWhatsAppMessage({
     `TOTAL:     ${fmt(total)}`,
     '',
     '[ PAGO ]',
-    `Metodo: ${paymentLabels[paymentMethod] ?? paymentMethod}`,
+  );
+
+  if (requirePaymentMethod) {
+    lines.push(`Metodo: ${paymentLabels[paymentMethod] ?? paymentMethod}`);
+  } else {
+    lines.push('El pago sera coordinado a traves de esta conversacion de WhatsApp.');
+  }
+
+  lines.push(
     '',
     '----------------------------------------',
     'Gracias por tu pedido en Street Candy\'s!',
@@ -850,6 +861,10 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { user, profile } = useAuth();
   const { settings: waSettings, loading: waSettingsLoading } = useWhatsAppSettings();
+  const { settings: checkoutSettings, loading: checkoutSettingsLoading } = useCheckoutSettings();
+
+  // Derived: whether payment method section should be shown
+  const requirePaymentMethod = checkoutSettings.require_payment_method;
 
   // Core state
   const [country, setCountry] = useState<Country>('CO');
@@ -1237,7 +1252,7 @@ export default function CheckoutPage() {
         carrito_id: carritoId,
         codigo_pais: country,
         email_contacto: !user ? form.email : undefined,
-        metodo_pago: paymentMethod,
+        metodo_pago: requirePaymentMethod ? paymentMethod : undefined,
         metodo_entrega: deliveryMethod,
         propina: tipAmount > 0 ? tipAmount : undefined,
         direccion_envio: {
@@ -1284,6 +1299,7 @@ export default function CheckoutPage() {
         total,
         country,
         paymentMethod,
+        requirePaymentMethod,
       });
 
       // Resolve phone: use settings if available, otherwise use hardcoded business number
@@ -1308,7 +1324,7 @@ export default function CheckoutPage() {
   };
 
   // ── Loading state ──────────────────────────────────────────────────────────
-  if (!mounted || cartLoading) {
+  if (!mounted || cartLoading || checkoutSettingsLoading) {
     return (
       <div className="min-h-screen bg-sc-cream flex items-center justify-center">
         <div
@@ -1497,12 +1513,14 @@ export default function CheckoutPage() {
                 country={country}
               />
 
-              {/* 7. Payment method */}
-              <PaymentMethodSection
-                selected={paymentMethod}
-                onSelect={setPaymentMethod}
-                country={country}
-              />
+              {/* 7. Payment method — only shown when require_payment_method is ON */}
+              {requirePaymentMethod && (
+                <PaymentMethodSection
+                  selected={paymentMethod}
+                  onSelect={setPaymentMethod}
+                  country={country}
+                />
+              )}
 
               {/* Submit error */}
               {submitError && (
@@ -1527,7 +1545,7 @@ export default function CheckoutPage() {
               {/* Submit button — Colombia: "Confirmar pedido" | Costa Rica: "Completar pedido por WhatsApp" */}
               <button
                 type="submit"
-                disabled={submitting || (country === 'CR' && waSettingsLoading)}
+                disabled={submitting || waSettingsLoading}
                 className="w-full bg-sc-forest text-sc-cream font-bold py-4 rounded-pill hover:bg-sc-green active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed text-base min-h-[56px]"
               >
                 {submitting ? (
