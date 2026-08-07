@@ -207,6 +207,18 @@ export const servicioCheckout = {
         puntos_recompensa_usados: puntosAUsar,
         descuento_cupon: descuentoCupon,
         descuento_recompensas: descuentoRecompensas,
+        // Customer & delivery fields — stored so the confirmation page can
+        // build the WhatsApp message even when shipping_address_id is null
+        // (guest orders) or when the address join returns no rows.
+        nombre_cliente: input.direccion_envio.nombre_completo,
+        email_contacto: email,
+        telefono: input.direccion_envio.telefono ?? null,
+        metodo_entrega: input.metodo_entrega ?? null,
+        direccion_linea1: input.direccion_envio.linea1,
+        direccion_linea2: input.direccion_envio.linea2 ?? null,
+        ciudad: input.direccion_envio.ciudad,
+        departamento_provincia: input.direccion_envio.departamento_provincia,
+        codigo_postal: input.direccion_envio.codigo_postal ?? null,
       },
     });
 

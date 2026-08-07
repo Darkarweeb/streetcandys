@@ -184,20 +184,39 @@ export default function OrdenConfirmadaPage() {
     if (orden) {
       const countryName = orden.country_code === 'CR' ? 'Costa Rica' : 'Colombia';
       const dir = orden.direccion_envio;
+      const meta = orden.metadata ?? {};
 
       const waUrl = buildWhatsAppOrderUrl(phoneNumber, {
         orderNumber: numeroOrden,
         orderDate: orden.created_at,
-        customerName: dir?.full_name ?? (orden.metadata?.nombre_cliente as string) ?? '',
-        phone: dir?.phone ?? (orden.metadata?.telefono as string) ?? '',
-        email: (orden.metadata?.email_contacto as string) ?? '',
+        customerName:
+          dir?.full_name ??
+          (meta.nombre_cliente as string) ??
+          '',
+        phone:
+          dir?.phone ??
+          (meta.telefono as string) ??
+          '',
+        email:
+          (meta.email_contacto as string) ??
+          '',
         country: countryName,
-        state: dir?.state_province ?? '',
-        city: dir?.city ?? '',
+        state:
+          dir?.state_province ??
+          (meta.departamento_provincia as string) ??
+          '',
+        city:
+          dir?.city ??
+          (meta.ciudad as string) ??
+          '',
         address: dir?.address_line1
           ? `${dir.address_line1}${dir.address_line2 ? `, ${dir.address_line2}` : ''}`
-          : '',
-        deliveryMethod: (orden.metadata?.metodo_entrega as string) ?? 'Envio estandar',
+          : (meta.direccion_linea1 as string)
+            ? `${meta.direccion_linea1 as string}${meta.direccion_linea2 ? `, ${meta.direccion_linea2 as string}` : ''}`
+            : '',
+        deliveryMethod:
+          (meta.metodo_entrega as string) ??
+          'Envio estandar',
         shippingCost: orden.shipping_cost ?? 0,
         couponCode: orden.coupon_code_snapshot ?? null,
         discountAmount: orden.discount_amount ?? 0,
