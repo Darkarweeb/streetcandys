@@ -722,12 +722,60 @@ function EffectsExplorer({
   country: string;
 }) {
   const effects = [
-    { key: 'relajante', label: 'Relajante', emoji: '😌', color: 'bg-blue-50 border-blue-200' },
-    { key: 'energizante', label: 'Energizante', emoji: '⚡', color: 'bg-yellow-50 border-yellow-200' },
-    { key: 'creativo', label: 'Creativo', emoji: '🎨', color: 'bg-purple-50 border-purple-200' },
-    { key: 'enfocado', label: 'Enfocado', emoji: '🎯', color: 'bg-green-50 border-green-200' },
-    { key: 'eufórico', label: 'Eufórico', emoji: '✨', color: 'bg-pink-50 border-pink-200' },
-    { key: 'calmante', label: 'Calmante', emoji: '🌙', color: 'bg-indigo-50 border-indigo-200' },
+    {
+      key: 'energizante',
+      label: 'Energizante',
+      emoji: '⚡',
+      subtitle: 'Perfecto para mantenerte activo.',
+      gradient: 'from-amber-400/20 to-yellow-300/10',
+      border: 'border-amber-300/40',
+      activeBg: 'bg-amber-50',
+    },
+    {
+      key: 'relajante',
+      label: 'Relajante',
+      emoji: '😌',
+      subtitle: 'Desconéctate y disfruta el momento.',
+      gradient: 'from-blue-400/20 to-sky-300/10',
+      border: 'border-blue-300/40',
+      activeBg: 'bg-blue-50',
+    },
+    {
+      key: 'creativo',
+      label: 'Creativo',
+      emoji: '🎨',
+      subtitle: 'Inspira nuevas ideas.',
+      gradient: 'from-purple-400/20 to-violet-300/10',
+      border: 'border-purple-300/40',
+      activeBg: 'bg-purple-50',
+    },
+    {
+      key: 'enfocado',
+      label: 'Enfocado',
+      emoji: '🎯',
+      subtitle: 'Máxima concentración.',
+      gradient: 'from-green-400/20 to-emerald-300/10',
+      border: 'border-green-300/40',
+      activeBg: 'bg-green-50',
+    },
+    {
+      key: 'eufórico',
+      label: 'Eufórico',
+      emoji: '✨',
+      subtitle: 'Eleva tu estado de ánimo.',
+      gradient: 'from-pink-400/20 to-rose-300/10',
+      border: 'border-pink-300/40',
+      activeBg: 'bg-pink-50',
+    },
+    {
+      key: 'calmante',
+      label: 'Calmante',
+      emoji: '🌙',
+      subtitle: 'Relájate al final del día.',
+      gradient: 'from-indigo-400/20 to-blue-300/10',
+      border: 'border-indigo-300/40',
+      activeBg: 'bg-indigo-50',
+    },
   ];
 
   const [selected, setSelected] = useState(effects[0].key);
@@ -756,6 +804,8 @@ function EffectsExplorer({
     load(selected);
   }, [selected, load]);
 
+  const selectedEffect = effects.find((e) => e.key === selected) ?? effects[0];
+
   return (
     <section
       id="efectos"
@@ -766,30 +816,51 @@ function EffectsExplorer({
         <SectionHeader
           label="Encuentra tu experiencia"
           title="Explorador de efectos"
-          subtitle="Selecciona el efecto que buscas y descubre los productos perfectos para ti."
+          subtitle="Elige la experiencia que buscas y descubre los productos perfectos para ti."
         />
 
-        {/* Effect pills */}
+        {/* Effect experience cards */}
         <div
-          className="flex flex-wrap gap-3 mb-10"
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-10"
           role="group"
           aria-label="Filtrar por efecto"
         >
-          {effects.map((e) => (
-            <button
-              key={e.key}
-              onClick={() => setSelected(e.key)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-pill border text-sm font-semibold transition-all duration-200 ${
-                selected === e.key
-                  ? 'bg-sc-forest text-sc-cream border-sc-forest'
-                  : 'bg-white text-sc-forest border-sc-border hover:border-sc-forest'
-              }`}
-              aria-pressed={selected === e.key}
-            >
-              <span aria-hidden="true">{e.emoji}</span>
-              {e.label}
-            </button>
-          ))}
+          {effects.map((e) => {
+            const isActive = selected === e.key;
+            return (
+              <button
+                key={e.key}
+                onClick={() => setSelected(e.key)}
+                className={`group relative flex flex-col items-start gap-2 p-4 rounded-card border text-left transition-all duration-200 ${
+                  isActive
+                    ? `bg-sc-forest border-sc-forest shadow-md scale-[1.02]`
+                    : `bg-white border-sc-border hover:border-sc-forest/40 hover:shadow-sm`
+                }`}
+                aria-pressed={isActive}
+              >
+                <span className="text-2xl leading-none" aria-hidden="true">
+                  {e.emoji}
+                </span>
+                <div>
+                  <p className={`font-bold text-sm leading-tight ${isActive ? 'text-sc-cream' : 'text-sc-forest'}`}>
+                    {e.label}
+                  </p>
+                  <p className={`text-xs mt-1 leading-snug ${isActive ? 'text-sc-cream/70' : 'text-sc-muted'}`}>
+                    {e.subtitle}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Active effect label */}
+        <div className="flex items-center gap-2 mb-6">
+          <span className="text-xl" aria-hidden="true">{selectedEffect.emoji}</span>
+          <p className="text-sc-forest font-semibold text-base">
+            {selectedEffect.label}
+            <span className="text-sc-muted font-normal text-sm ml-2">— {selectedEffect.subtitle}</span>
+          </p>
         </div>
 
         {loading ? (
@@ -1746,34 +1817,31 @@ export default function HomePage() {
           {/* 4. Best Sellers */}
           <BestSellers onAddToCart={handleAddToCart} country={country} />
 
-          {/* 5. Product Categories */}
-          <ProductCategories />
-
-          {/* 6. Effects Explorer */}
+          {/* 5. Effects Explorer — primary discovery section */}
           <EffectsExplorer onAddToCart={handleAddToCart} country={country} />
 
-          {/* 7. Rewards Club Preview */}
+          {/* 6. Rewards Club Preview */}
           <RewardsClubPreview user={user} />
 
-          {/* 8. Educational Section */}
+          {/* 7. Educational Section */}
           <EducationalSection />
 
-          {/* 9. Blog Preview */}
+          {/* 8. Blog Preview */}
           <BlogPreview />
 
-          {/* 10. Customer Reviews */}
+          {/* 9. Customer Reviews */}
           <CustomerReviews />
 
-          {/* 11. Newsletter */}
+          {/* 10. Newsletter */}
           <NewsletterSection country={country} />
 
-          {/* 12. FAQ */}
+          {/* 11. FAQ */}
           <FAQSection />
 
-          {/* 13. Partners / Allied Brands */}
+          {/* 12. Partners / Allied Brands */}
           <PartnersSection />
 
-          {/* 14. Instagram / Social */}
+          {/* 13. Instagram / Social */}
           <SocialSection />
         </main>
 
