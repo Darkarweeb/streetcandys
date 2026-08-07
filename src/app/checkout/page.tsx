@@ -793,7 +793,7 @@ function OrderSummary({
 export default function CheckoutPage() {
   const router = useRouter();
   const { user, profile } = useAuth();
-  const { settings: waSettings } = useWhatsAppSettings();
+  const { settings: waSettings, loading: waSettingsLoading } = useWhatsAppSettings();
 
   // Core state
   const [country, setCountry] = useState<Country>('CO');
@@ -1173,6 +1173,12 @@ export default function CheckoutPage() {
         ? `https://wa.me/${phoneNumber}?text=${encodeURIComponent(waMessage)}`
         : `https://wa.me/?text=${encodeURIComponent(waMessage)}`;
 
+      // Safety guard: waUrl must be a non-empty string before navigating
+      if (!waUrl) {
+        if (waWindow && !waWindow.closed) waWindow.close();
+        throw new Error('No se pudo generar el enlace de WhatsApp. Intenta de nuevo.');
+      }
+
       if (waWindow && !waWindow.closed) {
         waWindow.location.href = waUrl;
       } else {
@@ -1414,7 +1420,7 @@ export default function CheckoutPage() {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || (country === 'CR' && waSettingsLoading)}
                 className="w-full bg-sc-forest text-sc-cream font-bold py-4 rounded-pill hover:bg-sc-green active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed text-base min-h-[56px]"
               >
                 {submitting ? (

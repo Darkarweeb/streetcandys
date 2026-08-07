@@ -57,8 +57,7 @@ export const repositorioCheckout = {
       .select(`
         *,
         producto:products(id, name, slug, thumbnail_url, weight_grams, is_active, sku),
-        variante:product_variants(id, name, value, variant_type, sku, price_modifier),
-        inventario:inventory(quantity, reserved_quantity, allow_backorder)
+        variante:product_variants(id, name, value, variant_type, sku, price_modifier)
       `)
       .eq('cart_id', carritoId);
 
@@ -69,9 +68,28 @@ export const repositorioCheckout = {
       throw new Error(`Error obteniendo ítems del carrito: ${errorItems.message}`);
     }
 
+    // Fetch inventory separately for each item (no direct FK between cart_items and inventory)
+    const itemsConInventario = await Promise.all(
+      (items ?? []).map(async (item) => {
+        let invQuery = supabase
+          .from('inventory')
+          .select('quantity, reserved_quantity, allow_backorder')
+          .eq('product_id', item.product_id);
+
+        if (item.variant_id) {
+          invQuery = invQuery.eq('variant_id', item.variant_id);
+        } else {
+          invQuery = invQuery.is('variant_id', null);
+        }
+
+        const { data: inv } = await invQuery.maybeSingle();
+        return { ...item, inventario: inv ?? null };
+      }),
+    );
+
     return {
       carrito: carrito as DbCart,
-      items: (items ?? []) as unknown as typeof items,
+      items: itemsConInventario as unknown as typeof itemsConInventario,
     };
   },
 
