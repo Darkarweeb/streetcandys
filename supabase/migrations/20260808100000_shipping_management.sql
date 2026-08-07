@@ -138,32 +138,32 @@ CREATE POLICY "public_read_shipping_same_day_config" ON public.shipping_same_day
 DROP POLICY IF EXISTS "admin_manage_shipping_methods" ON public.shipping_methods;
 CREATE POLICY "admin_manage_shipping_methods" ON public.shipping_methods
   FOR ALL TO authenticated
-  USING (public.is_admin(auth.uid()))
-  WITH CHECK (public.is_admin(auth.uid()));
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "admin_manage_shipping_country_settings" ON public.shipping_country_settings;
 CREATE POLICY "admin_manage_shipping_country_settings" ON public.shipping_country_settings
   FOR ALL TO authenticated
-  USING (public.is_admin(auth.uid()))
-  WITH CHECK (public.is_admin(auth.uid()));
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "admin_manage_shipping_regions" ON public.shipping_regions;
 CREATE POLICY "admin_manage_shipping_regions" ON public.shipping_regions
   FOR ALL TO authenticated
-  USING (public.is_admin(auth.uid()))
-  WITH CHECK (public.is_admin(auth.uid()));
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "admin_manage_shipping_rates" ON public.shipping_rates;
 CREATE POLICY "admin_manage_shipping_rates" ON public.shipping_rates
   FOR ALL TO authenticated
-  USING (public.is_admin(auth.uid()))
-  WITH CHECK (public.is_admin(auth.uid()));
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS "admin_manage_shipping_same_day_config" ON public.shipping_same_day_config;
 CREATE POLICY "admin_manage_shipping_same_day_config" ON public.shipping_same_day_config
   FOR ALL TO authenticated
-  USING (public.is_admin(auth.uid()))
-  WITH CHECK (public.is_admin(auth.uid()));
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 -- ── Seed Data ─────────────────────────────────────────────────
 DO $$
