@@ -235,6 +235,8 @@ export function normalizarFiltros(filtros: ProductFilters): ProductFilters {
     }
   }
 
+  // Normalize effects and tags to lowercase for consistent case-insensitive matching
+  // DB stores effects/tags in lowercase (enforced by migration 20260809100000)
   if (Array.isArray(filtros.efectos) && filtros.efectos.length > 0) {
     resultado.efectos = filtros.efectos.map((e) => e.trim().toLowerCase()).filter(Boolean);
   }

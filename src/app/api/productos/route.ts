@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     if (precioMax) filtros.precio_max = parseFloat(precioMax);
 
     const efectos = searchParams.get('efectos');
-    if (efectos) filtros.efectos = efectos.split(',').map((e) => e.trim());
+    if (efectos) filtros.efectos = efectos.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
 
     const etiquetas = searchParams.get('etiquetas');
     if (etiquetas) filtros.etiquetas = etiquetas.split(',').map((t) => t.trim());
