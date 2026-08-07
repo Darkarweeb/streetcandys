@@ -722,12 +722,12 @@ function EffectsExplorer({
   country: string;
 }) {
   const effects = [
-    { key: 'relajante', label: 'Relajante', emoji: '😌', color: 'bg-blue-50 border-blue-200' },
-    { key: 'energizante', label: 'Energizante', emoji: '⚡', color: 'bg-yellow-50 border-yellow-200' },
-    { key: 'creativo', label: 'Creativo', emoji: '🎨', color: 'bg-purple-50 border-purple-200' },
-    { key: 'enfocado', label: 'Enfocado', emoji: '🎯', color: 'bg-green-50 border-green-200' },
-    { key: 'eufórico', label: 'Eufórico', emoji: '✨', color: 'bg-pink-50 border-pink-200' },
-    { key: 'calmante', label: 'Calmante', emoji: '🌙', color: 'bg-indigo-50 border-indigo-200' },
+    { key: 'Relajante', label: 'Relajante', emoji: '😌', color: 'bg-blue-50 border-blue-200' },
+    { key: 'Energizante', label: 'Energizante', emoji: '⚡', color: 'bg-yellow-50 border-yellow-200' },
+    { key: 'Creativo', label: 'Creativo', emoji: '🎨', color: 'bg-purple-50 border-purple-200' },
+    { key: 'Enfocado', label: 'Enfocado', emoji: '🎯', color: 'bg-green-50 border-green-200' },
+    { key: 'Eufórico', label: 'Eufórico', emoji: '✨', color: 'bg-pink-50 border-pink-200' },
+    { key: 'Calmante', label: 'Calmante', emoji: '🌙', color: 'bg-indigo-50 border-indigo-200' },
   ];
 
   const [selected, setSelected] = useState(effects[0].key);
