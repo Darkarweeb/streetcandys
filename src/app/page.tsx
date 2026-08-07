@@ -1,4 +1,4 @@
-// cache-bust-5
+// cache-bust-7
 'use client';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import Navigation from '@/components/Navigation';
 import AnnouncementBar from '@/components/AnnouncementBar';
-import type { ProductSummary, CategoryWithChildren } from '@/lib/products/types';
+import type { ProductSummary } from '@/lib/products/types';
 import { formatPrice, formatPriceValue, isProductAvailableInCountry, type Country } from '@/lib/price';
 import { useCartPersistence } from '@/hooks/useCartPersistence';
 import { getBlogImageProps } from '@/lib/blog/blog-image-utils';
@@ -598,121 +598,6 @@ function BestSellers({
   );
 }
 
-// ─── PRODUCT CATEGORIES ───────────────────────────────────────────────────────
-function ProductCategories() {
-  const [categories, setCategories] = useState<CategoryWithChildren[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/categorias');
-      const data = await res.json();
-      if (data.exito) setCategories(data.datos ?? []);
-      else setError('No se pudieron cargar las categorías.');
-    } catch {
-      setError('Error de conexión.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const categoryIcons: Record<string, string> = {
-    flores: '🌸',
-    gummies: '🍬',
-    comestibles: '🍫',
-    bebidas: '🥤',
-    prerolls: '🌿',
-    concentrados: '💎',
-    topicos: '🧴',
-    accesorios: '🛠️',
-  };
-
-  return (
-    <section
-      id="categorias"
-      className="py-16 lg:py-24 bg-sc-darkforest"
-      aria-labelledby="categorias-title"
-    >
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
-        <div className="mb-8 lg:mb-10">
-          <p className="text-sc-cream/50 text-xs font-bold uppercase tracking-widest mb-2">
-            Explora
-          </p>
-          <h2
-            id="categorias-title"
-            className="text-sc-cream font-black text-3xl lg:text-4xl tracking-tightest leading-none"
-          >
-            Categorías de productos
-          </h2>
-        </div>
-
-        {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="rounded-card bg-sc-cream/10 animate-pulse h-32" />
-            ))}
-          </div>
-        ) : error ? (
-          <ErrorState message={error} onRetry={load} />
-        ) : categories.length === 0 ? (
-          <EmptyState message="No hay categorías disponibles." />
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {categories.map((cat) => {
-              const icon = categoryIcons[cat.slug] ?? '🌿';
-              return (
-                <Link
-                  key={cat.id}
-                  href={`/productos?categoria=${cat.slug}`}
-                  className="group relative rounded-card bg-sc-cream/5 border border-sc-cream/10 p-6 flex flex-col items-start gap-3 hover:bg-sc-cream/10 transition-all duration-300 hover:border-sc-cream/20"
-                  aria-label={`Categoría: ${cat.name}`}
-                >
-                  <span className="text-3xl" aria-hidden="true">
-                    {icon}
-                  </span>
-                  <div>
-                    <h3 className="text-sc-cream font-bold text-base leading-tight">
-                      {cat.name}
-                    </h3>
-                    {cat.product_count !== undefined && cat.product_count > 0 && (
-                      <p className="text-sc-cream/70 text-xs mt-0.5">
-                        {cat.product_count} productos
-                      </p>
-                    )}
-                  </div>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    className="text-sc-cream/30 group-hover:text-sc-cream/60 transition-colors mt-auto"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M3 8h10M9 4l4 4-4 4"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
 // ─── EFFECTS EXPLORER ─────────────────────────────────────────────────────────
 function EffectsExplorer({
   onAddToCart,
@@ -722,17 +607,83 @@ function EffectsExplorer({
   country: string;
 }) {
   const effects = [
-    { key: 'relajante', label: 'Relajante', emoji: '😌', color: 'bg-blue-50 border-blue-200' },
-    { key: 'energizante', label: 'Energizante', emoji: '⚡', color: 'bg-yellow-50 border-yellow-200' },
-    { key: 'creativo', label: 'Creativo', emoji: '🎨', color: 'bg-purple-50 border-purple-200' },
-    { key: 'enfocado', label: 'Enfocado', emoji: '🎯', color: 'bg-green-50 border-green-200' },
-    { key: 'eufórico', label: 'Eufórico', emoji: '✨', color: 'bg-pink-50 border-pink-200' },
-    { key: 'calmante', label: 'Calmante', emoji: '🌙', color: 'bg-indigo-50 border-indigo-200' },
+    {
+      key: 'energizante',
+      label: 'Energizante',
+      emoji: '⚡',
+      description: 'Perfect for staying active and energized.',
+      accentBg: 'bg-amber-50',
+      accentBorder: 'border-amber-300',
+      accentText: 'text-amber-700',
+      accentIcon: 'bg-amber-100',
+      activeBg: 'bg-amber-500',
+      activeGlow: 'shadow-amber-200',
+    },
+    {
+      key: 'relajante',
+      label: 'Relajante',
+      emoji: '😌',
+      description: 'Disconnect and enjoy the moment.',
+      accentBg: 'bg-emerald-50',
+      accentBorder: 'border-emerald-300',
+      accentText: 'text-emerald-700',
+      accentIcon: 'bg-emerald-100',
+      activeBg: 'bg-emerald-600',
+      activeGlow: 'shadow-emerald-200',
+    },
+    {
+      key: 'creativo',
+      label: 'Creativo',
+      emoji: '🎨',
+      description: 'Spark new ideas and inspiration.',
+      accentBg: 'bg-purple-50',
+      accentBorder: 'border-purple-300',
+      accentText: 'text-purple-700',
+      accentIcon: 'bg-purple-100',
+      activeBg: 'bg-purple-600',
+      activeGlow: 'shadow-purple-200',
+    },
+    {
+      key: 'enfocado',
+      label: 'Enfocado',
+      emoji: '🎯',
+      description: 'Maximum concentration when you need it most.',
+      accentBg: 'bg-blue-50',
+      accentBorder: 'border-blue-300',
+      accentText: 'text-blue-700',
+      accentIcon: 'bg-blue-100',
+      activeBg: 'bg-blue-600',
+      activeGlow: 'shadow-blue-200',
+    },
+    {
+      key: 'eufórico',
+      label: 'Eufórico',
+      emoji: '✨',
+      description: 'Lift your mood and enjoy the experience.',
+      accentBg: 'bg-rose-50',
+      accentBorder: 'border-rose-300',
+      accentText: 'text-rose-700',
+      accentIcon: 'bg-rose-100',
+      activeBg: 'bg-gradient-to-br from-pink-500 to-orange-400',
+      activeGlow: 'shadow-rose-200',
+    },
+    {
+      key: 'calmante',
+      label: 'Calmante',
+      emoji: '🌙',
+      description: 'Relax and unwind at the end of the day.',
+      accentBg: 'bg-indigo-50',
+      accentBorder: 'border-indigo-300',
+      accentText: 'text-indigo-700',
+      accentIcon: 'bg-indigo-100',
+      activeBg: 'bg-indigo-900',
+      activeGlow: 'shadow-indigo-200',
+    },
   ];
 
-  const [selected, setSelected] = useState(effects[0].key);
+  const [selected, setSelected] = useState<string | null>(null);
   const [products, setProducts] = useState<ProductSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (effect: string) => {
@@ -753,76 +704,183 @@ function EffectsExplorer({
   }, []);
 
   useEffect(() => {
-    load(selected);
+    if (selected) load(selected);
   }, [selected, load]);
+
+  const selectedEffect = effects.find((e) => e.key === selected) ?? null;
+
+  const handleSelect = (key: string) => {
+    setSelected((prev) => (prev === key ? null : key));
+    if (selected === key) setProducts([]);
+  };
 
   return (
     <section
       id="efectos"
-      className="py-16 lg:py-24 bg-sc-beige"
+      className="py-20 lg:py-32 bg-sc-beige overflow-hidden"
       aria-labelledby="efectos-title"
+      suppressHydrationWarning
     >
       <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
-        <SectionHeader
-          label="Encuentra tu experiencia"
-          title="Explorador de efectos"
-          subtitle="Selecciona el efecto que buscas y descubre los productos perfectos para ti."
-        />
-
-        {/* Effect pills */}
-        <div
-          className="flex flex-wrap gap-3 mb-10"
-          role="group"
-          aria-label="Filtrar por efecto"
-        >
-          {effects.map((e) => (
-            <button
-              key={e.key}
-              onClick={() => setSelected(e.key)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-pill border text-sm font-semibold transition-all duration-200 ${
-                selected === e.key
-                  ? 'bg-sc-forest text-sc-cream border-sc-forest'
-                  : 'bg-white text-sc-forest border-sc-border hover:border-sc-forest'
-              }`}
-              aria-pressed={selected === e.key}
-            >
-              <span aria-hidden="true">{e.emoji}</span>
-              {e.label}
-            </button>
-          ))}
+        {/* Section Header */}
+        <div className="text-center mb-14 lg:mb-16">
+          <p className="text-sc-forest/60 text-xs font-bold uppercase tracking-widest mb-3">
+            Explorador de efectos
+          </p>
+          <h2
+            id="efectos-title"
+            className="text-sc-forest font-black text-4xl lg:text-5xl tracking-tightest leading-none mb-4"
+          >
+            ¿Cómo quieres sentirte hoy?
+          </h2>
+          <p className="text-sc-forest/70 text-base lg:text-lg max-w-xl mx-auto leading-relaxed">
+            Descubre productos basados en la experiencia que estás buscando.
+          </p>
         </div>
 
-        {loading ? (
-          <ProductGridSkeleton count={4} />
-        ) : error ? (
-          <ErrorState message={error} onRetry={() => load(selected)} />
-        ) : products.length === 0 ? (
-          <EmptyState message={`No hay productos con efecto "${selected}" disponibles.`} />
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} onAddToCart={onAddToCart} country={country} />
-            ))}
+        {/* Effect Cards — horizontal scroll on mobile, grid on desktop */}
+        <div
+          className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide sm:grid sm:grid-cols-3 lg:grid-cols-6 sm:overflow-visible sm:pb-0"
+          role="group"
+          aria-label="Filtrar por efecto"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {effects.map((e) => {
+            const isActive = selected === e.key;
+            return (
+              <button
+                key={e.key}
+                onClick={() => handleSelect(e.key)}
+                className={`
+                  group relative flex-shrink-0 snap-start
+                  w-[160px] sm:w-auto
+                  flex flex-col items-center text-center gap-4 p-6
+                  rounded-2xl border-2 text-left
+                  transition-all duration-300 ease-out
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sc-forest
+                  ${isActive
+                    ? `${e.activeBg} border-transparent text-white shadow-xl ${e.activeGlow} shadow-lg scale-[1.04]`
+                    : `bg-white ${e.accentBorder} hover:scale-[1.03] hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]`
+                  }
+                `}
+                aria-pressed={isActive}
+              >
+                {/* Icon circle */}
+                <div
+                  className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl transition-all duration-300 ${
+                    isActive ? 'bg-white/20' : e.accentIcon
+                  }`}
+                  aria-hidden="true"
+                >
+                  {e.emoji}
+                </div>
+
+                {/* Text */}
+                <div className="space-y-1.5">
+                  <p
+                    className={`font-black text-base leading-tight transition-colors duration-300 ${
+                      isActive ? 'text-white' : 'text-sc-forest'
+                    }`}
+                  >
+                    {e.label}
+                  </p>
+                  <p
+                    className={`text-xs leading-snug transition-colors duration-300 ${
+                      isActive ? 'text-white/80' : 'text-sc-muted'
+                    }`}
+                  >
+                    {e.description}
+                  </p>
+                </div>
+
+                {/* Active indicator dot */}
+                {isActive && (
+                  <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-white/70" aria-hidden="true" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Selected Effect Badge + Products */}
+        {selected && selectedEffect && (
+          <div className="mt-12">
+            {/* Badge */}
+            <div className="flex items-center gap-3 mb-8 flex-wrap">
+              <div
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border ${selectedEffect.accentBg} ${selectedEffect.accentBorder}`}
+              >
+                <span className="text-base" aria-hidden="true">{selectedEffect.emoji}</span>
+                <span className={`text-sm font-bold ${selectedEffect.accentText}`}>
+                  Mostrando productos para:{' '}
+                  <span className="font-black">{selectedEffect.label}</span>
+                </span>
+              </div>
+              <button
+                onClick={() => { setSelected(null); setProducts([]); }}
+                className="inline-flex items-center gap-1.5 text-sc-muted text-sm font-semibold hover:text-sc-forest transition-colors group"
+                aria-label="Limpiar filtro de efecto"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  className="group-hover:rotate-90 transition-transform duration-200"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2 2l10 10M12 2L2 12"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                Limpiar filtro
+              </button>
+            </div>
+
+            {/* Products */}
+            {loading ? (
+              <ProductGridSkeleton count={4} />
+            ) : error ? (
+              <ErrorState message={error} onRetry={() => load(selected)} />
+            ) : products.length === 0 ? (
+              <EmptyState message={`No hay productos con efecto "${selected}" disponibles.`} />
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+                {products.map((p) => (
+                  <ProductCard key={p.id} product={p} onAddToCart={onAddToCart} country={country} />
+                ))}
+              </div>
+            )}
+
+            <div className="mt-8 text-center">
+              <Link
+                href={`/productos?efectos=${selected}`}
+                className="inline-flex items-center gap-2 text-sc-forest text-sm font-bold border-b border-sc-forest pb-0.5 hover:opacity-70 transition-opacity"
+              >
+                Ver todos los productos con este efecto
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <path
+                    d="M3 7h8M8 4l3 3-3 3"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </Link>
+            </div>
           </div>
         )}
 
-        <div className="mt-8 text-center">
-          <Link
-            href={`/productos?efectos=${selected}`}
-            className="inline-flex items-center gap-2 text-sc-forest text-sm font-bold border-b border-sc-forest pb-0.5 hover:opacity-70 transition-opacity"
-          >
-            Ver todos los productos con este efecto
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path
-                d="M3 7h8M8 4l3 3-3 3"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </Link>
-        </div>
+        {/* Hint when nothing selected */}
+        {!selected && (
+          <p className="text-center text-sc-muted text-sm mt-10">
+            Selecciona un efecto para ver los productos recomendados.
+          </p>
+        )}
       </div>
     </section>
   );
@@ -1733,7 +1791,7 @@ export default function HomePage() {
           onCountryChange={handleCountryChange}
         />
 
-        <main id="main-content">
+        <main id="main-content" suppressHydrationWarning>
           {/* 1. Hero */}
           <HeroSection country={country} onShopNow={scrollToFeatured} />
 
@@ -1746,34 +1804,31 @@ export default function HomePage() {
           {/* 4. Best Sellers */}
           <BestSellers onAddToCart={handleAddToCart} country={country} />
 
-          {/* 5. Product Categories */}
-          <ProductCategories />
-
-          {/* 6. Effects Explorer */}
+          {/* 5. Effects Explorer — primary discovery section */}
           <EffectsExplorer onAddToCart={handleAddToCart} country={country} />
 
-          {/* 7. Rewards Club Preview */}
+          {/* 6. Rewards Club Preview */}
           <RewardsClubPreview user={user} />
 
-          {/* 8. Educational Section */}
+          {/* 7. Educational Section */}
           <EducationalSection />
 
-          {/* 9. Blog Preview */}
+          {/* 8. Blog Preview */}
           <BlogPreview />
 
-          {/* 10. Customer Reviews */}
+          {/* 9. Customer Reviews */}
           <CustomerReviews />
 
-          {/* 11. Newsletter */}
+          {/* 10. Newsletter */}
           <NewsletterSection country={country} />
 
-          {/* 12. FAQ */}
+          {/* 11. FAQ */}
           <FAQSection />
 
-          {/* 13. Partners / Allied Brands */}
+          {/* 12. Partners / Allied Brands */}
           <PartnersSection />
 
-          {/* 14. Instagram / Social */}
+          {/* 13. Instagram / Social */}
           <SocialSection />
         </main>
 
