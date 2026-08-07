@@ -1,4 +1,4 @@
-// cache-bust-5
+// cache-bust-6
 'use client';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import Navigation from '@/components/Navigation';
 import AnnouncementBar from '@/components/AnnouncementBar';
-import type { ProductSummary, CategoryWithChildren } from '@/lib/products/types';
+import type { ProductSummary } from '@/lib/products/types';
 import { formatPrice, formatPriceValue, isProductAvailableInCountry, type Country } from '@/lib/price';
 import { useCartPersistence } from '@/hooks/useCartPersistence';
 import { getBlogImageProps } from '@/lib/blog/blog-image-utils';
@@ -591,121 +591,6 @@ function BestSellers({
                 <ProductCard product={p} onAddToCart={onAddToCart} country={country} />
               </div>
             ))}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-// ─── PRODUCT CATEGORIES ───────────────────────────────────────────────────────
-function ProductCategories() {
-  const [categories, setCategories] = useState<CategoryWithChildren[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/categorias');
-      const data = await res.json();
-      if (data.exito) setCategories(data.datos ?? []);
-      else setError('No se pudieron cargar las categorías.');
-    } catch {
-      setError('Error de conexión.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const categoryIcons: Record<string, string> = {
-    flores: '🌸',
-    gummies: '🍬',
-    comestibles: '🍫',
-    bebidas: '🥤',
-    prerolls: '🌿',
-    concentrados: '💎',
-    topicos: '🧴',
-    accesorios: '🛠️',
-  };
-
-  return (
-    <section
-      id="categorias"
-      className="py-16 lg:py-24 bg-sc-darkforest"
-      aria-labelledby="categorias-title"
-    >
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
-        <div className="mb-8 lg:mb-10">
-          <p className="text-sc-cream/50 text-xs font-bold uppercase tracking-widest mb-2">
-            Explora
-          </p>
-          <h2
-            id="categorias-title"
-            className="text-sc-cream font-black text-3xl lg:text-4xl tracking-tightest leading-none"
-          >
-            Categorías de productos
-          </h2>
-        </div>
-
-        {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="rounded-card bg-sc-cream/10 animate-pulse h-32" />
-            ))}
-          </div>
-        ) : error ? (
-          <ErrorState message={error} onRetry={load} />
-        ) : categories.length === 0 ? (
-          <EmptyState message="No hay categorías disponibles." />
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {categories.map((cat) => {
-              const icon = categoryIcons[cat.slug] ?? '🌿';
-              return (
-                <Link
-                  key={cat.id}
-                  href={`/productos?categoria=${cat.slug}`}
-                  className="group relative rounded-card bg-sc-cream/5 border border-sc-cream/10 p-6 flex flex-col items-start gap-3 hover:bg-sc-cream/10 transition-all duration-300 hover:border-sc-cream/20"
-                  aria-label={`Categoría: ${cat.name}`}
-                >
-                  <span className="text-3xl" aria-hidden="true">
-                    {icon}
-                  </span>
-                  <div>
-                    <h3 className="text-sc-cream font-bold text-base leading-tight">
-                      {cat.name}
-                    </h3>
-                    {cat.product_count !== undefined && cat.product_count > 0 && (
-                      <p className="text-sc-cream/70 text-xs mt-0.5">
-                        {cat.product_count} productos
-                      </p>
-                    )}
-                  </div>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    className="text-sc-cream/30 group-hover:text-sc-cream/60 transition-colors mt-auto"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M3 8h10M9 4l4 4-4 4"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </Link>
-              );
-            })}
           </div>
         )}
       </div>
