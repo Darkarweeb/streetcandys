@@ -127,7 +127,11 @@ export default function CartDrawer({
     if (!isDrawerOpen) return;
     (async () => {
       try {
-        const res = await fetch(`/api/carrito?pais=${activeCountry}`);
+        const sessionId =
+          typeof window !== 'undefined' ? (localStorage.getItem('sc_session_id') ?? undefined) : undefined;
+        const res = await fetch(`/api/carrito?pais=${activeCountry}`, {
+          headers: sessionId ? { 'x-session-id': sessionId } : {},
+        });
         const data = await res.json();
         if (data.exito && data.datos?.cupon) {
           const cupon = data.datos.cupon;
@@ -152,9 +156,14 @@ export default function CartDrawer({
     setCouponError(null);
     setCouponSuccess(null);
     try {
+      const sessionId =
+        typeof window !== 'undefined' ? (localStorage.getItem('sc_session_id') ?? undefined) : undefined;
       const res = await fetch('/api/carrito/cupon', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionId ? { 'x-session-id': sessionId } : {}),
+        },
         body: JSON.stringify({ codigo: code, pais: activeCountry }),
       });
       const data = await res.json();
@@ -187,7 +196,12 @@ export default function CartDrawer({
     setCouponError(null);
     setCouponSuccess(null);
     try {
-      await fetch(`/api/carrito/cupon?pais=${activeCountry}`, { method: 'DELETE' });
+      const sessionId =
+        typeof window !== 'undefined' ? (localStorage.getItem('sc_session_id') ?? undefined) : undefined;
+      await fetch(`/api/carrito/cupon?pais=${activeCountry}`, {
+        method: 'DELETE',
+        headers: sessionId ? { 'x-session-id': sessionId } : {},
+      });
     } catch {
       // best-effort
     } finally {
@@ -210,7 +224,11 @@ export default function CartDrawer({
     if (appliedCoupon.type === 'shipping') return;
     (async () => {
       try {
-        const res = await fetch(`/api/carrito?pais=${activeCountry}`);
+        const sessionId =
+          typeof window !== 'undefined' ? (localStorage.getItem('sc_session_id') ?? undefined) : undefined;
+        const res = await fetch(`/api/carrito?pais=${activeCountry}`, {
+          headers: sessionId ? { 'x-session-id': sessionId } : {},
+        });
         const data = await res.json();
         if (data.exito && data.datos?.cupon) {
           const cupon = data.datos.cupon;

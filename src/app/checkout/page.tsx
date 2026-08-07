@@ -805,7 +805,10 @@ export default function CheckoutPage() {
 
     (async () => {
       try {
-        const res = await fetch(`/api/carrito?pais=${activeCountry}`);
+        const sessionId = localStorage.getItem('sc_session_id') ?? undefined;
+        const res = await fetch(`/api/carrito?pais=${activeCountry}`, {
+          headers: sessionId ? { 'x-session-id': sessionId } : {},
+        });
         const data = await res.json();
         if (data.exito && data.datos) {
           const cartData = data.datos;
@@ -878,9 +881,13 @@ export default function CheckoutPage() {
     if (!couponInput.trim()) return;
     setCoupon((prev) => ({ ...prev, loading: true, error: null }));
     try {
+      const sessionId = localStorage.getItem('sc_session_id') ?? undefined;
       const res = await fetch('/api/carrito/cupon', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionId ? { 'x-session-id': sessionId } : {}),
+        },
         body: JSON.stringify({ codigo: couponInput.trim(), pais: country }),
       });
       const data = await res.json();
@@ -909,7 +916,11 @@ export default function CheckoutPage() {
 
   const handleRemoveCoupon = useCallback(async () => {
     try {
-      await fetch(`/api/carrito/cupon?pais=${country}`, { method: 'DELETE' });
+      const sessionId = localStorage.getItem('sc_session_id') ?? undefined;
+      await fetch(`/api/carrito/cupon?pais=${country}`, {
+        method: 'DELETE',
+        headers: sessionId ? { 'x-session-id': sessionId } : {},
+      });
     } catch {
       // best-effort
     }
@@ -989,7 +1000,10 @@ export default function CheckoutPage() {
     try {
       let activeCarritoId = carritoId;
       if (!activeCarritoId) {
-        const cartRes = await fetch(`/api/carrito?pais=${country}`);
+        const sessionId = localStorage.getItem('sc_session_id') ?? undefined;
+        const cartRes = await fetch(`/api/carrito?pais=${country}`, {
+          headers: sessionId ? { 'x-session-id': sessionId } : {},
+        });
         const cartData = await cartRes.json();
         if (!cartData.exito || !cartData.datos?.id) {
           throw new Error('No se pudo obtener el carrito. Intenta de nuevo.');
