@@ -104,26 +104,31 @@ function buildWhatsAppMessage({
   cartItems,
   subtotal,
   shipping,
+  deliveryMethod,
   couponDiscount,
+  couponCode,
   tax,
   tipAmount,
   total,
   country,
+  paymentMethod,
 }: {
   numeroOrden: string;
   form: CheckoutForm;
   cartItems: CartItem[];
   subtotal: number;
   shipping: number;
+  deliveryMethod: string;
   couponDiscount: number;
+  couponCode: string | null;
   tax: number;
   tipAmount: number;
   total: number;
   country: Country;
+  paymentMethod: string;
 }): string {
   const currency = country === 'CO' ? 'COP' : 'CRC';
 
-  // Safe formatter — falls back to plain number if Intl throws (e.g. CRC in some envs)
   const fmt = (n: number): string => {
     try {
       return n.toLocaleString('es-CO', { style: 'currency', currency, maximumFractionDigits: 0 });
@@ -133,48 +138,97 @@ function buildWhatsAppMessage({
     }
   };
 
-  const productLines =
-    cartItems.length > 0
-      ? cartItems.map((item) => `  • ${item.name} x${item.qty}`).join('\n')
-      : '  (sin productos)';
+  const methodLabels: Record<string, string> = {
+    standard: 'Envío estándar',
+    express: 'Envío express',
+    same_day: 'Mismo día',
+  };
+
+  const paymentLabels: Record<string, string> = {
+    card: 'Tarjeta de crédito / débito',
+    nequi: 'Nequi',
+    pse: 'PSE',
+    bancolombia: 'Bancolombia',
+    sinpe_movil: 'SINPE Móvil',
+  };
 
   const lines: string[] = [
-    `🛍️ *Nuevo Pedido - Street Candy*`,
+    `========================================`,
+    `🛍️  STREET CANDY'S ORDER`,
+    `========================================`,
     ``,
-    `📋 *Número de orden:* ${numeroOrden}`,
-    `👤 *Cliente:* ${form.nombre_completo}`,
-    `📞 *Teléfono:* ${form.telefono}`,
-    `📧 *Email:* ${form.email}`,
+    `📋 Orden: ${numeroOrden}`,
     ``,
-    `📦 *Productos:*`,
-    productLines,
-    ``,
-    `📍 *Dirección de entrega:*`,
-    `  ${form.direccion}`,
-    `  ${form.ciudad}, ${form.departamento}`,
+    `📦 PRODUCTOS`,
+    `----------------------------------------`,
   ];
 
-  if (form.notas) {
-    lines.push(``, `📝 *Notas:* ${form.notas}`);
+  if (cartItems.length > 0) {
+    cartItems.forEach((item) => {
+      const unitPrice = parseFloat(item.price.replace(/[^0-9.]/g, ''));
+      const lineTotal = unitPrice * item.qty;
+      lines.push(`• ${item.name}`);
+      lines.push(`  Cantidad: ${item.qty}  |  Precio unit.: ${fmt(unitPrice)}  |  Total: ${fmt(lineTotal)}`);
+    });
+  } else {
+    lines.push('  (sin productos)');
   }
 
   lines.push(
     ``,
-    `💰 *Resumen de pago:*`,
-    `  Subtotal: ${fmt(subtotal)}`,
-    `  Envío: ${shipping === 0 ? 'Gratis' : fmt(shipping)}`,
-    `  Impuestos: ${fmt(tax)}`,
+    `----------------------------------------`,
+    `  Subtotal:         ${fmt(subtotal)}`,
+    `  Método de envío:  ${methodLabels[deliveryMethod] ?? deliveryMethod}`,
+    `  Costo de envío:   ${shipping === 0 ? 'Gratis' : fmt(shipping)}`,
   );
 
-  if (couponDiscount > 0) {
-    lines.push(`  Descuento cupón: -${fmt(couponDiscount)}`);
+  if (couponCode) {
+    lines.push(`  Cupón:            ${couponCode}`);
+    if (couponDiscount > 0) {
+      lines.push(`  Descuento:        -${fmt(couponDiscount)}`);
+    }
   }
 
   if (tipAmount > 0) {
-    lines.push(`  Propina: ${fmt(tipAmount)}`);
+    lines.push(`  Propina:          ${fmt(tipAmount)}`);
   }
 
-  lines.push(`  *Total: ${fmt(total)}*`);
+  if (tax > 0) {
+    lines.push(`  Impuestos:        ${fmt(tax)}`);
+  }
+
+  lines.push(
+    `  ──────────────────────────────────────`,
+    `  TOTAL:            ${fmt(total)}`,
+    ``,
+    `----------------------------------------`,
+    `👤 CLIENTE`,
+    `----------------------------------------`,
+    `  Nombre:           ${form.nombre_completo}`,
+    `  Teléfono:         ${form.telefono}`,
+    `  Email:            ${form.email}`,
+    `  País:             ${country === 'CO' ? '🇨🇴 Colombia' : '🇨🇷 Costa Rica'}`,
+    `  Depto/Provincia:  ${form.departamento}`,
+    `  Ciudad:           ${form.ciudad}`,
+    `  Dirección:        ${form.direccion}`,
+  );
+
+  if (form.notas) {
+    lines.push(`  Instrucciones:    ${form.notas}`);
+  }
+
+  lines.push(
+    ``,
+    `----------------------------------------`,
+    `💳 MÉTODO DE PAGO`,
+    `----------------------------------------`,
+    `  ${paymentLabels[paymentMethod] ?? paymentMethod}`,
+    ``,
+    `========================================`,
+    `¡Gracias por tu pedido en Street Candy's! 🍬`,
+    `Te contactaremos pronto para confirmar tu entrega.`,
+    `========================================`,
+  );
 
   return lines.join('\n');
 }
@@ -959,6 +1013,11 @@ export default function CheckoutPage() {
   // ── Coupon handlers ────────────────────────────────────────────────────────
   const handleApplyCoupon = useCallback(async () => {
     if (!couponInput.trim()) return;
+    // Always use the already-loaded carritoId — never re-resolve
+    if (!carritoId) {
+      setCoupon((prev) => ({ ...prev, loading: false, error: 'El carrito no está listo. Recarga la página.' }));
+      return;
+    }
     setCoupon((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const sessionId = localStorage.getItem('sc_session_id') ?? undefined;
@@ -971,7 +1030,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           codigo: couponInput.trim(),
           pais: country,
-          ...(carritoId ? { carrito_id: carritoId } : {}),
+          carrito_id: carritoId,
         }),
       });
       const data = await res.json();
@@ -980,7 +1039,6 @@ export default function CheckoutPage() {
         return;
       }
       const cupon = data.datos?.cupon ?? null;
-      // Prefer server-calculated discount from resumen, fall back to cupon object
       const descuento =
         data.datos?.resumen?.descuento_cupon ??
         cupon?.descuento_calculado ??
@@ -996,7 +1054,7 @@ export default function CheckoutPage() {
     } catch {
       setCoupon((prev) => ({ ...prev, loading: false, error: 'Error al aplicar el cupón' }));
     }
-  }, [couponInput, country]);
+  }, [couponInput, country, carritoId]);
 
   const handleRemoveCoupon = useCallback(async () => {
     try {
@@ -1066,10 +1124,8 @@ export default function CheckoutPage() {
     e.preventDefault();
     setSubmitError(null);
 
-    // Guard: prevent double submission
     if (submitting) return;
 
-    // Guard: empty cart
     if (cartItems.length === 0) {
       setSubmitError('Tu carrito está vacío. Agrega productos antes de continuar.');
       return;
@@ -1083,42 +1139,22 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Guard: invalid total
     if (total <= 0) {
       setSubmitError('El total del pedido no es válido. Revisa los productos y descuentos.');
       return;
     }
 
-    // Lock submission immediately to prevent double-click race
+    // Guard: carritoId must already be loaded — never re-resolve
+    if (!carritoId) {
+      setSubmitError('El carrito no está listo. Recarga la página e intenta de nuevo.');
+      return;
+    }
+
     setSubmitting(true);
 
-    // Open a blank window NOW (synchronous, before any await) so popup blockers allow it.
-    // We will set its location after the order is created successfully.
-    // NOTE: Do NOT use 'noopener' here — it causes the returned reference to be null
-    // in modern browsers, making it impossible to set location.href later.
-    const waWindow = window.open('', '_blank');
-
     try {
-      let activeCarritoId = carritoId;
-      if (!activeCarritoId) {
-        const sessionId = localStorage.getItem('sc_session_id') ?? undefined;
-        const cartRes = await fetch(`/api/carrito?pais=${country}`, {
-          headers: sessionId ? { 'x-session-id': sessionId } : {},
-        });
-        const cartData = await cartRes.json();
-        if (!cartData.exito || !cartData.datos?.id) {
-          throw new Error('No se pudo obtener el carrito. Intenta de nuevo.');
-        }
-        activeCarritoId = cartData.datos.id;
-      }
-
-      // Guard: verify cart is still non-empty before submitting
-      if (cartItems.length === 0) {
-        throw new Error('Tu carrito está vacío. Agrega productos antes de continuar.');
-      }
-
       const payload = {
-        carrito_id: activeCarritoId,
+        carrito_id: carritoId,
         codigo_pais: country,
         email_contacto: !user ? form.email : undefined,
         metodo_pago: paymentMethod,
@@ -1147,57 +1183,49 @@ export default function CheckoutPage() {
       const data = await res.json();
       if (!data.exito) throw new Error(data.error ?? 'Error al procesar el pedido');
 
-      // Rotate key so a fresh submission after success gets a new key
       idempotencyKeyRef.current = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
       const ordenId: string = data.datos?.orden_id ?? data.datos?.id ?? '';
       const numeroOrden: string = data.datos?.numero_orden ?? '';
 
-      // Build WhatsApp message and navigate the pre-opened window
-      const waMessage = buildWhatsAppMessage({
-        numeroOrden,
-        form,
-        cartItems,
-        subtotal,
-        shipping,
-        couponDiscount,
-        tax,
-        tipAmount,
-        total,
-        country,
-      });
+      if (country === 'CR') {
+        // Build WhatsApp message from existing checkout state
+        const waMessage = buildWhatsAppMessage({
+          numeroOrden,
+          form,
+          cartItems,
+          subtotal,
+          shipping,
+          deliveryMethod,
+          couponDiscount,
+          couponCode: coupon.code,
+          tax,
+          tipAmount,
+          total,
+          country,
+          paymentMethod,
+        });
 
-      // Use business phone from settings if available, otherwise open generic new-chat
-      const phoneNumber = waSettings.phone.replace(/\D/g, ''); // strip non-digits
-      const waUrl = phoneNumber
-        ? `https://wa.me/${phoneNumber}?text=${encodeURIComponent(waMessage)}`
-        : `https://wa.me/?text=${encodeURIComponent(waMessage)}`;
+        // Use hardcoded business number (573115397983) as primary, fall back to settings
+        const rawPhone = waSettings?.phone?.replace(/\D/g, '') || '573115397983';
+        const phoneNumber = rawPhone || '573115397983';
+        const waUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(waMessage)}`;
 
-      // Safety guard: waUrl must be a non-empty string before navigating
-      if (!waUrl) {
-        if (waWindow && !waWindow.closed) waWindow.close();
-        throw new Error('No se pudo generar el enlace de WhatsApp. Intenta de nuevo.');
-      }
-
-      if (waWindow && !waWindow.closed) {
-        waWindow.location.href = waUrl;
-      } else {
-        // Fallback: popup was blocked — open normally
-        window.open(waUrl, '_blank', 'noopener,noreferrer');
+        // Navigate directly — no window.open('', '_blank') pre-open
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+          window.location.href = waUrl;
+        } else {
+          window.open(waUrl, '_blank', 'noopener,noreferrer');
+        }
       }
 
       router.push(`/orden-confirmada/${ordenId}?numero=${encodeURIComponent(numeroOrden)}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error al procesar el pedido';
       setSubmitError(msg);
-      // Close the pre-opened blank window on error so it doesn't linger
-      if (waWindow && !waWindow.closed) {
-        waWindow.close();
-      }
-      // Release lock on error so user can retry
       setSubmitting(false);
     }
-    // Note: do NOT call setSubmitting(false) on success — navigation will unmount the component
   };
 
   // ── Loading state ──────────────────────────────────────────────────────────
