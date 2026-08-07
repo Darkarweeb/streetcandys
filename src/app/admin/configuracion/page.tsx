@@ -244,6 +244,151 @@ function WhatsAppSection({ settings, onSaved }: WhatsAppSectionProps) {
   );
 }
 
+// ─── Checkout Settings Section ────────────────────────────────
+interface CheckoutConfig {
+  require_payment_method: boolean;
+}
+
+interface CheckoutSettingsSectionProps {
+  settings: Setting[];
+  onSaved: () => void;
+}
+
+function CheckoutSettingsSection({ settings, onSaved }: CheckoutSettingsSectionProps) {
+  const supabase = createClient();
+  const setting = settings.find(s => s.key === 'checkout_settings');
+  const rawVal = setting?.value as Partial<CheckoutConfig> | undefined;
+
+  const [form, setForm] = useState<CheckoutConfig>({
+    require_payment_method: rawVal?.require_payment_method ?? false,
+  });
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (rawVal !== undefined) {
+      setForm({ require_payment_method: rawVal.require_payment_method ?? false });
+    }
+  }, [setting?.id]);
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      if (setting) {
+        const { error } = await supabase
+          .from('settings')
+          .update({ value: form as unknown as Record<string, unknown> })
+          .eq('id', setting.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('settings').insert({
+          key: 'checkout_settings',
+          value: form as unknown as Record<string, unknown>,
+          description: 'Configuración del proceso de checkout: métodos de pago y comportamiento.',
+          is_public: true,
+        });
+        if (error) throw error;
+      }
+      showToast('Configuración de checkout guardada');
+      onSaved();
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Error al guardar');
+    } finally { setSaving(false); }
+  };
+
+  const Toggle = ({ checked, onChange, label, description }: { checked: boolean; onChange: () => void; label: string; description?: string }) => (
+    <div className="flex items-start justify-between py-4 border-b border-gray-100 last:border-0 gap-4">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-sc-forest font-medium">{label}</p>
+        {description && <p className="text-xs text-gray-400 mt-0.5">{description}</p>}
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-xs text-gray-500">{checked ? 'Activo' : 'Inactivo'}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          onClick={onChange}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sc-forest/40 ${checked ? 'bg-sc-forest' : 'bg-gray-300'}`}
+        >
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {toast && <div className="fixed top-4 right-4 z-50 bg-sc-forest text-white px-4 py-3 rounded-xl shadow-lg text-sm animate-slide-up">{toast}</div>}
+
+      {/* Header card */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-sc-forest/5">
+          <div className="w-10 h-10 rounded-full bg-sc-forest flex items-center justify-center flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+              <line x1="1" y1="10" x2="23" y2="10"/>
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-bold text-sc-forest">Configuración de Checkout</h3>
+            <p className="text-gray-500 text-xs">Controla el comportamiento del proceso de pago</p>
+          </div>
+        </div>
+
+        <div className="px-6 py-2">
+          <Toggle
+            checked={form.require_payment_method}
+            onChange={() => setForm(f => ({ ...f, require_payment_method: !f.require_payment_method }))}
+            label="Requerir método de pago"
+            description={
+              form.require_payment_method
+                ? 'El cliente debe seleccionar un método de pago antes de completar el pedido.'
+                : 'El método de pago está oculto. El pago se coordinará directamente por WhatsApp.'
+            }
+          />
+        </div>
+      </div>
+
+      {/* Info card */}
+      <div className={`rounded-xl border p-4 flex items-start gap-3 ${form.require_payment_method ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={`w-5 h-5 flex-shrink-0 mt-0.5 ${form.require_payment_method ? 'text-amber-500' : 'text-green-600'}`} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <div>
+          {form.require_payment_method ? (
+            <>
+              <p className="text-amber-800 text-sm font-semibold">Método de pago activado</p>
+              <p className="text-amber-700 text-xs mt-0.5">El cliente verá y deberá seleccionar un método de pago durante el checkout. El mensaje de WhatsApp incluirá el método seleccionado.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-green-800 text-sm font-semibold">Método de pago desactivado (recomendado para lanzamiento)</p>
+              <p className="text-green-700 text-xs mt-0.5">La sección de pago estará oculta. El pedido se crea con método de pago nulo y el mensaje de WhatsApp indicará que el pago se coordinará en la conversación.</p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Save button */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-sc-forest text-white rounded-lg px-6 py-2.5 text-sm font-medium hover:bg-sc-darkforest transition-colors disabled:opacity-60 flex items-center gap-2"
+        >
+          {saving && <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70"/></svg>}
+          {saving ? 'Guardando...' : 'Guardar configuración'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal País ───────────────────────────────────────────────
 interface ModalPaisProps {
   pais: Pais | null;
@@ -387,7 +532,7 @@ export default function AdminConfiguracionPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  const [tab, setTab] = useState<'paises' | 'tienda' | 'whatsapp'>('paises');
+  const [tab, setTab] = useState<'paises' | 'tienda' | 'whatsapp' | 'checkout'>('paises');
   const [paises, setPaises] = useState<Pais[]>([]);
   const [settings, setSettings] = useState<Setting[]>([]);
   const [loading, setLoading] = useState(true);
@@ -477,10 +622,10 @@ export default function AdminConfiguracionPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit mb-6">
-        {(['paises', 'tienda', 'whatsapp'] as const).map(t => (
+        {(['paises', 'tienda', 'whatsapp', 'checkout'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === t ? 'bg-white text-sc-forest shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-            {t === 'paises' ? 'Países' : t === 'tienda' ? 'Tienda' : 'WhatsApp'}
+            {t === 'paises' ? 'Países' : t === 'tienda' ? 'Tienda' : t === 'whatsapp' ? 'WhatsApp' : 'Checkout'}
           </button>
         ))}
       </div>
@@ -588,6 +733,11 @@ export default function AdminConfiguracionPage() {
       {/* WhatsApp */}
       {tab === 'whatsapp' && (
         <WhatsAppSection settings={settings} onSaved={fetchSettings} />
+      )}
+
+      {/* Checkout */}
+      {tab === 'checkout' && (
+        <CheckoutSettingsSection settings={settings} onSaved={fetchSettings} />
       )}
     </AdminLayout>
   );
