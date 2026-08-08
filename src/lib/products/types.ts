@@ -255,7 +255,7 @@ export interface CreateProductInput {
   origin_country?: string;
   brand?: string;
   sku?: string;
-  base_price: number;
+  base_price?: number;
   compare_at_price?: number;
   price_crc?: number | null;
   price_cop?: number | null;

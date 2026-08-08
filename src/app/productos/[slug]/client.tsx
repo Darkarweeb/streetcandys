@@ -259,16 +259,20 @@ export default function ProductDetailPage() {
   const inStock = activeVariant
     ? activeVariant.is_in_stock !== false
     : product.inventory_status?.is_in_stock !== false;
-  const hasDiscount = product.compare_at_price && product.compare_at_price > product.base_price;
-  const discountPct = hasDiscount ? Math.round((1 - product.base_price / product.compare_at_price!) * 100) : 0;
+  const hasDiscount = product.compare_at_price && product.compare_at_price > (product.price_cop ?? product.base_price);
+  const discountPct = hasDiscount ? Math.round((1 - (product.price_cop ?? product.base_price) / product.compare_at_price!) * 100) : 0;
 
-  // Country-aware price — apply variant price_modifier if a variant is selected
-  const basePrice = activeVariant
-    ? product.base_price + (activeVariant.price_modifier ?? 0)
-    : product.base_price;
-  const priceStr = country === 'CR' && product.price_crc
-    ? formatPriceValue(product.price_crc + (activeVariant?.price_modifier ?? 0), 'CR')
-    : formatPriceValue(basePrice, 'CO');
+  // Country-aware price — use price_cop for CO, price_crc for CR
+  // Apply variant price_modifier if a variant is selected
+  const variantModifier = activeVariant?.price_modifier ?? 0;
+  const coPrice = product.price_cop ?? product.base_price; // legacy fallback for CO
+  const priceStr = country === 'CR'
+    ? (product.price_crc != null
+        ? formatPriceValue(product.price_crc + variantModifier, 'CR')
+        : 'Precio no disponible')
+    : (coPrice != null
+        ? formatPriceValue(coPrice + variantModifier, 'CO')
+        : 'Precio no disponible');
   const comparePriceStr = hasDiscount && country === 'CO'
     ? formatPriceValue(product.compare_at_price!, 'CO')
     : null;

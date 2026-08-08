@@ -346,9 +346,13 @@ function validarInputProducto(input: CreateProductInput): { valido: boolean; err
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.slug)) {
     return { valido: false, error: 'El slug solo puede contener letras minúsculas, números y guiones' };
   }
-  if (input.base_price < 0) return { valido: false, error: 'El precio base no puede ser negativo' };
-  if (input.intensity_level !== undefined && (input.intensity_level < 1 || input.intensity_level > 5)) {
-    return { valido: false, error: 'El nivel de intensidad debe estar entre 1 y 5' };
+  if (input.base_price != null && input.base_price < 0) {
+    return { valido: false, error: 'El precio base no puede ser negativo' };
+  }
+  if (input.intensity_level !== undefined) {
+    if (!Number.isInteger(input.intensity_level) || input.intensity_level < 1 || input.intensity_level > 5) {
+      return { valido: false, error: 'El nivel de intensidad debe ser un número entero entre 1 y 5' };
+    }
   }
   return { valido: true, error: '' };
 }
