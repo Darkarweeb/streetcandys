@@ -505,33 +505,39 @@ export const inventarioCarritoRepositorio = {
 
   /**
    * Obtiene el precio actual de un producto/variante
+   * Colombia → price_cop, Costa Rica → price_crc
    */
   async obtenerPrecioProducto(
     productoId: string,
     varianteId: string | null,
+    codigoPais: string = 'CO',
   ): Promise<number | null> {
     const supabase = createAdminClient();
+    const camposPrecio = codigoPais === 'CR' ? 'price_crc' : 'price_cop';
 
     if (varianteId) {
       const { data, error } = await supabase
         .from('product_variants')
-        .select('price_modifier, products:product_id(base_price)')
+        .select(`price_modifier, products:product_id(${camposPrecio})`)
         .eq('id', varianteId)
         .maybeSingle();
 
       if (error || !data) return null;
-      const producto = data.products as { base_price: number } | null;
+      const producto = data.products as Record<string, number | null> | null;
       if (!producto) return null;
-      return producto.base_price + (data.price_modifier ?? 0);
+      const basePrice = producto[camposPrecio];
+      if (basePrice == null) return null;
+      return basePrice + (data.price_modifier ?? 0);
     } else {
       const { data, error } = await supabase
         .from('products')
-        .select('base_price')
+        .select(camposPrecio)
         .eq('id', productoId)
         .maybeSingle();
 
       if (error || !data) return null;
-      return data.base_price;
+      const price = (data as Record<string, number | null>)[camposPrecio];
+      return price ?? null;
     }
   },
 };

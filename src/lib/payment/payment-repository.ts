@@ -4,7 +4,7 @@
  * Usa la tabla orders (payment_reference, payment_status, payment_method).
  */
 
-import { createClient } from '../supabase/server';
+import { createAdminClient } from '../supabase/admin';
 import type { DbOrden, EstadoPago, MetodoPago } from '../payment/types';
 import { loggerPagos } from '../payment/logger';
 
@@ -25,7 +25,7 @@ export const repositorioPagos = {
     metodo: MetodoPago | null,
     estado: EstadoPago,
   ): Promise<void> {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Only include payment_method in the update when it is a real enum value.
     // "manual" is the internal provider name — it is NOT a valid PostgreSQL enum value
@@ -58,7 +58,7 @@ export const repositorioPagos = {
    * Actualiza solo el estado de pago de una orden
    */
   async actualizarEstadoPago(ordenId: string, estado: EstadoPago): Promise<void> {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from('orders')
       .update({
@@ -80,7 +80,7 @@ export const repositorioPagos = {
    * Busca una orden por referencia del proveedor de pago
    */
   async buscarPorReferencia(referencia: string): Promise<DbOrden | null> {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('orders')
       .select('*')
@@ -102,7 +102,7 @@ export const repositorioPagos = {
     ordenId: string,
     metadata: Record<string, unknown>,
   ): Promise<void> {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Obtener metadata actual
     const { data: orden } = await supabase
