@@ -6,8 +6,8 @@
  *  - Colombia (CO): price_cop in COP, formatted as "$12.000"
  *  - Costa Rica (CR): price_crc in CRC, formatted as "₡5.000"
  *  - A product is visible in CR ONLY if price_crc is set.
- *  - A product is visible in CO if price_cop is set, or legacy base_price exists.
- *  - If the country price is missing, returns null — never falls back to USD.
+ *  - A product is visible in CO ONLY if price_cop is set.
+ *  - If the country price is missing, returns null — NEVER falls back to base_price or USD.
  */
 
 export type Country = 'CO' | 'CR';
@@ -30,9 +30,8 @@ export const CURRENCY_CODE: Record<Country, string> = {
 /**
  * Returns the price for a product in the given country.
  * Returns null if the product does not have a price for that country.
- * Colombia → price_cop (falls back to base_price for legacy products that predate price_cop column)
- * Costa Rica → price_crc
- * NEVER uses base_price as a primary price source.
+ * Colombia → price_cop only (null if missing — never falls back to base_price)
+ * Costa Rica → price_crc only (null if missing)
  */
 export function getProductPrice(
   product: { base_price?: number | null; price_crc?: number | null; price_cop?: number | null },
@@ -41,10 +40,8 @@ export function getProductPrice(
   if (country === 'CR') {
     return product.price_crc != null ? product.price_crc : null;
   }
-  // CO: prefer price_cop; fall back to base_price only for legacy products without price_cop
-  if (product.price_cop != null) return product.price_cop;
-  if (product.base_price != null) return product.base_price;
-  return null;
+  // CO: price_cop only — no base_price fallback
+  return product.price_cop != null ? product.price_cop : null;
 }
 
 /**
@@ -57,8 +54,8 @@ export function isProductAvailableInCountry(
   if (country === 'CR') {
     return product.price_crc != null;
   }
-  // CO: available if price_cop is set, or legacy base_price exists
-  return product.price_cop != null || product.base_price != null;
+  // CO: available only if price_cop is set
+  return product.price_cop != null;
 }
 
 /**
