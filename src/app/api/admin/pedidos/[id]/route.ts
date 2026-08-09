@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user }, error } = await supabase.auth.getUser();
@@ -80,18 +81,22 @@ export async function POST(request: NextRequest, { params }: Params) {
 export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
 
-    // 1. Verify admin authorization
+    // 1. Verify admin authorization using the user-session client
+    const supabase = await createClient();
     const user = await requireAdmin(supabase);
     if (!user) return NextResponse.json({ exito: false, error: 'Acceso denegado' }, { status: 403 });
 
-    // 2. Validate order ID and verify order exists
+    // 2. Validate order ID
     if (!id || typeof id !== 'string') {
       return NextResponse.json({ exito: false, error: 'ID de pedido inválido' }, { status: 400 });
     }
 
-    const { data: orden, error: fetchError } = await supabase
+    // Use the service-role admin client for all destructive operations so RLS is bypassed server-side
+    const adminClient = createAdminClient();
+
+    // 3. Verify the order exists
+    const { data: orden, error: fetchError } = await adminClient
       .from('orders')
       .select('id, order_number')
       .eq('id', id)
@@ -101,8 +106,8 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       return NextResponse.json({ exito: false, error: 'Pedido no encontrado' }, { status: 404 });
     }
 
-    // 3. Delete exclusively-owned records first (order_items, order_internal_notes)
-    const { error: itemsError } = await supabase
+    // 4. Delete exclusively-owned records first
+    const { error: itemsError } = await adminClient
       .from('order_items')
       .delete()
       .eq('order_id', id);
@@ -114,7 +119,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       );
     }
 
-    const { error: notasError } = await supabase
+    const { error: notasError } = await adminClient
       .from('order_internal_notes')
       .delete()
       .eq('order_id', id);
@@ -126,10 +131,8 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       );
     }
 
-    // 4. Nullify order_id on shared records that reference this order
-    // (coupon_redemptions, reward_transactions, promotion_redemptions, reviews)
-    // These belong to profiles/coupons/promotions — do NOT delete them.
-    const { error: couponRedemptionsError } = await supabase
+    // 5. Delete coupon_redemptions for this order
+    const { error: couponRedemptionsError } = await adminClient
       .from('coupon_redemptions')
       .delete()
       .eq('order_id', id);
@@ -141,7 +144,8 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       );
     }
 
-    const { error: rewardTxError } = await supabase
+    // 6. Nullify order_id on shared records that reference this order
+    const { error: rewardTxError } = await adminClient
       .from('reward_transactions')
       .update({ order_id: null })
       .eq('order_id', id);
@@ -153,7 +157,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       );
     }
 
-    const { error: promoRedemptionsError } = await supabase
+    const { error: promoRedemptionsError } = await adminClient
       .from('promotion_redemptions')
       .update({ order_id: null })
       .eq('order_id', id);
@@ -165,7 +169,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       );
     }
 
-    const { error: reviewsError } = await supabase
+    const { error: reviewsError } = await adminClient
       .from('reviews')
       .update({ order_id: null })
       .eq('order_id', id);
@@ -177,8 +181,8 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       );
     }
 
-    // 5. Delete the order itself
-    const { error: deleteError } = await supabase
+    // 7. Delete the order itself
+    const { error: deleteError } = await adminClient
       .from('orders')
       .delete()
       .eq('id', id);
