@@ -134,6 +134,7 @@ export const carritoServicio = {
       const precioActual = await inventarioCarritoRepositorio.obtenerPrecioProducto(
         input.producto_id,
         input.variante_id ?? null,
+        codigoPais,
       );
       if (precioActual === null) {
         return { exito: false, error: 'Producto no encontrado o no disponible.' };
@@ -574,6 +575,7 @@ export const carritoServicio = {
             inventarioCarritoRepositorio.obtenerPrecioProducto(
               itemLocal.producto_id,
               itemLocal.variante_id ?? null,
+              codigoPais,
             ),
             inventarioCarritoRepositorio.obtenerDisponibilidad(
               itemLocal.producto_id,

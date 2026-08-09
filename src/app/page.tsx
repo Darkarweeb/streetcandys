@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Navigation from '@/components/Navigation';
 import AnnouncementBar from '@/components/AnnouncementBar';
 import type { ProductSummary } from '@/lib/products/types';
-import { formatPrice, formatPriceValue, isProductAvailableInCountry, type Country } from '@/lib/price';
+import { formatPrice, formatPriceValue, isProductAvailableInCountry, getProductPrice, type Country } from '@/lib/price';
 import { useCartPersistence } from '@/hooks/useCartPersistence';
 import { getBlogImageProps } from '@/lib/blog/blog-image-utils';
 
@@ -70,12 +70,12 @@ function ProductCard({
   const inStock = product.inventory_status?.is_in_stock !== false;
   const available = isProductAvailableInCountry(product, country);
   const hasDiscount =
-    product.compare_at_price && product.compare_at_price > product.base_price;
+    product.compare_at_price && product.compare_at_price > (product.price_cop ?? 0);
   const discountPct = hasDiscount
-    ? Math.round((1 - product.base_price / product.compare_at_price!) * 100)
+    ? Math.round((1 - (product.price_cop ?? 0) / product.compare_at_price!) * 100)
     : 0;
 
-  const priceStr = formatPrice(product, country) ?? formatPriceValue(product.base_price, 'CO');
+  const priceStr = formatPrice(product, country);
   const comparePriceStr = hasDiscount && country === 'CO'
     ? formatPriceValue(product.compare_at_price!, 'CO')
     : null;
@@ -1725,7 +1725,7 @@ export default function HomePage() {
         {
           id: product.id,
           name: product.name,
-          price: String(product.base_price),
+          price: String(getProductPrice(product, country as Country) ?? 0),
           qty: 1,
           image: product.thumbnail_url ?? product.images?.[0]?.url ?? '',
         },

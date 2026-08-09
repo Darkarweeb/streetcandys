@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Navigation from '@/components/Navigation';
@@ -107,7 +107,7 @@ function ProgressTracker({ status }: { status: string }) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────
-export default function OrdenConfirmadaPage() {
+function OrdenConfirmadaContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const ordenId = params?.id as string;
@@ -421,5 +421,17 @@ export default function OrdenConfirmadaPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function OrdenConfirmadaPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-sc-cream flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-sc-forest border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <OrdenConfirmadaContent />
+    </Suspense>
   );
 }

@@ -274,6 +274,31 @@ function OrderDrawer({ orden, onClose, onRefresh }: {
     }
   };
 
+  const handleDelete = async () => {
+    const confirmed = await confirm({
+      title: '¿Eliminar pedido permanentemente?',
+      message: `Esta acción no se puede deshacer. El pedido #${orden.order_number} y sus datos asociados serán eliminados definitivamente.`,
+      confirmLabel: 'Eliminar definitivamente',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    setSaving(true); setSaveError(null);
+    try {
+      const res = await fetch(`/api/admin/pedidos/${(fullOrder || orden).id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!data.exito) throw new Error(data.error);
+      toastSuccess('Pedido eliminado correctamente.');
+      onRefresh();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Error al eliminar el pedido');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleRefund = async (monto?: number, motivo?: string) => {
     setRefundProcessing(true); setRefundError(null);
     try {
@@ -338,6 +363,13 @@ function OrderDrawer({ orden, onClose, onRefresh }: {
                 Cancelar pedido
               </button>
             )}
+            <button onClick={handleDelete} disabled={saving}
+              className="px-3 py-1.5 text-xs font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-60 flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M1.5 3h9M4.5 3V2.25a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75V3M3 3l.75 7.5h4.5L9 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Eliminar pedido
+            </button>
             {canRefund && (
               <button onClick={() => setShowRefund(true)}
                 className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg transition-colors">
@@ -786,7 +818,7 @@ export default function AdminPedidosPage() {
         <OrderDrawer
           orden={ordenSeleccionada}
           onClose={() => setOrdenSeleccionada(null)}
-          onRefresh={() => { fetchOrdenes(); showToast('Pedido actualizado'); setOrdenSeleccionada(null); }}
+          onRefresh={() => { fetchOrdenes(); setOrdenSeleccionada(null); }}
         />
       )}
     </AdminLayout>

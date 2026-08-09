@@ -37,7 +37,6 @@ interface ProductFormData {
   description: string;
   ingredients: string;
   usage_instructions: string;
-  base_price: string;
   compare_at_price: string;
   price_crc: string;
   price_cop: string;
@@ -60,7 +59,7 @@ interface ProductFormData {
 const FORM_INICIAL: ProductFormData = {
   name: '', slug: '', short_description: '', description: '',
   ingredients: '', usage_instructions: '',
-  base_price: '', compare_at_price: '', price_crc: '', price_cop: '',
+  compare_at_price: '', price_crc: '', price_cop: '',
   category_id: '', sku: '', brand: '',
   is_active: true, is_featured: false, requires_age_verification: true,
   tags: '', effects: '', intensity_level: '', origin_country: 'CO',
@@ -648,7 +647,6 @@ export default function AdminProductoEditPage() {
           description: p.description || '',
           ingredients: p.ingredients || '',
           usage_instructions: p.usage_instructions || '',
-          base_price: String(p.base_price || ''),
           compare_at_price: p.compare_at_price ? String(p.compare_at_price) : '',
           price_crc: p.price_crc != null ? String(p.price_crc) : '',
           price_cop: p.price_cop != null ? String(p.price_cop) : '',
@@ -709,10 +707,20 @@ export default function AdminProductoEditPage() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.slug.trim() || !form.base_price) {
-      setSaveError('Nombre, slug y precio base son requeridos');
+    if (!form.name.trim() || !form.slug.trim()) {
+      setSaveError('Nombre y slug son requeridos');
       return;
     }
+
+    // Validate intensity_level: must be an integer between 1 and 5
+    if (form.intensity_level) {
+      const intensityNum = Number(form.intensity_level);
+      if (!Number.isInteger(intensityNum) || intensityNum < 1 || intensityNum > 5) {
+        setSaveError('La intensidad debe ser un número entero entre 1 y 5');
+        return;
+      }
+    }
+
     setSaving(true);
     setSaveError(null);
 
@@ -725,7 +733,6 @@ export default function AdminProductoEditPage() {
       description: form.description || undefined,
       ingredients: form.ingredients || undefined,
       usage_instructions: form.usage_instructions || undefined,
-      base_price: Number(form.base_price),
       compare_at_price: form.compare_at_price ? Number(form.compare_at_price) : undefined,
       price_crc: form.price_crc ? Number(form.price_crc) : null,
       price_cop: form.price_cop ? Number(form.price_cop) : null,
@@ -737,7 +744,7 @@ export default function AdminProductoEditPage() {
       requires_age_verification: form.requires_age_verification,
       tags: form.tags ? form.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean) : [],
       effects: form.effects ? form.effects.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean) : [],
-      intensity_level: form.intensity_level ? Number(form.intensity_level) : undefined,
+      intensity_level: form.intensity_level ? Math.round(Number(form.intensity_level)) : undefined,
       origin_country: form.origin_country,
       weight_grams: form.weight_grams ? Number(form.weight_grams) : undefined,
       meta_title: form.meta_title || undefined,
@@ -904,31 +911,7 @@ export default function AdminProductoEditPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-sc-forest mb-1">Precio base (USD) *</label>
-                      <input
-                        type="number"
-                        value={form.base_price}
-                        onChange={(e) => set('base_price', e.target.value)}
-                        min="0"
-                        step="0.01"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-sc-forest mb-1">Precio comparación</label>
-                      <input
-                        type="number"
-                        value={form.compare_at_price}
-                        onChange={(e) => set('compare_at_price', e.target.value)}
-                        min="0"
-                        step="0.01"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
-                        placeholder="0.00"
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-sc-forest mb-1">
                         Precio Costa Rica (CRC)
@@ -957,6 +940,18 @@ export default function AdminProductoEditPage() {
                         step="1"
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
                         placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-sc-forest mb-1">Precio comparación</label>
+                      <input
+                        type="number"
+                        value={form.compare_at_price}
+                        onChange={(e) => set('compare_at_price', e.target.value)}
+                        min="0"
+                        step="0.01"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
+                        placeholder="0.00"
                       />
                     </div>
                   </div>
@@ -1021,12 +1016,20 @@ export default function AdminProductoEditPage() {
                       <input
                         type="number"
                         value={form.intensity_level}
-                        onChange={(e) => set('intensity_level', e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          // Only allow empty string or integers 1-5
+                          if (val === '' || (/^\d+$/.test(val) && Number(val) >= 1 && Number(val) <= 5)) {
+                            set('intensity_level', val);
+                          }
+                        }}
                         min="1"
                         max="5"
+                        step="1"
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
                         placeholder="1-5"
                       />
+                      <p className="text-gray-400 text-xs mt-1">Solo valores enteros: 1, 2, 3, 4 o 5</p>
                     </div>
                   </div>
 

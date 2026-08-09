@@ -3,10 +3,11 @@
  * Single source of truth for price formatting and country-aware pricing.
  *
  * Rules:
- *  - Colombia (CO): base_price in COP, formatted as "$12.000"
+ *  - Colombia (CO): price_cop in COP, formatted as "$12.000"
  *  - Costa Rica (CR): price_crc in CRC, formatted as "₡5.000"
  *  - A product is visible in CR ONLY if price_crc is set.
- *  - Products are always visible in CO.
+ *  - A product is visible in CO ONLY if price_cop is set.
+ *  - If the country price is missing, returns null — NEVER falls back to base_price or USD.
  */
 
 export type Country = 'CO' | 'CR';
@@ -28,29 +29,33 @@ export const CURRENCY_CODE: Record<Country, string> = {
 
 /**
  * Returns the price for a product in the given country.
- * Returns null if the product is not available in that country.
+ * Returns null if the product does not have a price for that country.
+ * Colombia → price_cop only (null if missing — never falls back to base_price)
+ * Costa Rica → price_crc only (null if missing)
  */
 export function getProductPrice(
-  product: { base_price: number; price_crc?: number | null },
+  product: { base_price?: number | null; price_crc?: number | null; price_cop?: number | null },
   country: Country,
 ): number | null {
   if (country === 'CR') {
     return product.price_crc != null ? product.price_crc : null;
   }
-  return product.base_price;
+  // CO: price_cop only — no base_price fallback
+  return product.price_cop != null ? product.price_cop : null;
 }
 
 /**
  * Returns true if the product is available in the given country.
  */
 export function isProductAvailableInCountry(
-  product: { base_price: number; price_crc?: number | null },
+  product: { base_price?: number | null; price_crc?: number | null; price_cop?: number | null },
   country: Country,
 ): boolean {
   if (country === 'CR') {
     return product.price_crc != null;
   }
-  return true; // CO: always visible
+  // CO: available only if price_cop is set
+  return product.price_cop != null;
 }
 
 /**
@@ -62,14 +67,12 @@ export function isProductAvailableInCountry(
  */
 export function formatPriceValue(amount: number, country: Country): string {
   if (country === 'CR') {
-    // CRC: ₡ symbol + thousands separator
     const formatted = new Intl.NumberFormat('es-CR', {
       maximumFractionDigits: 0,
       minimumFractionDigits: 0,
     }).format(amount);
     return `₡${formatted}`;
   }
-  // COP: $ symbol + thousands separator (es-CO style uses . as thousands sep)
   const formatted = new Intl.NumberFormat('es-CO', {
     maximumFractionDigits: 0,
     minimumFractionDigits: 0,
@@ -83,7 +86,7 @@ export function formatPriceValue(amount: number, country: Country): string {
  * or null if the product is not available in that country.
  */
 export function formatPrice(
-  product: { base_price: number; price_crc?: number | null },
+  product: { base_price?: number | null; price_crc?: number | null; price_cop?: number | null },
   country: Country,
 ): string | null {
   const price = getProductPrice(product, country);

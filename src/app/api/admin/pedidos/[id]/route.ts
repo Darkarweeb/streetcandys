@@ -1,6 +1,7 @@
 /**
  * GET /api/admin/pedidos/[id] — Get full order details
- * POST /api/admin/pedidos/[id]/notas — Add internal note
+ * POST /api/admin/pedidos/[id] — Add internal note
+ * DELETE /api/admin/pedidos/[id] — Permanently delete an order (admin only)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -73,5 +74,130 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ exito: true, datos: data });
   } catch (err) {
     return NextResponse.json({ exito: false, error: err instanceof Error ? err.message : 'Error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(_request: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+
+    // 1. Verify admin authorization
+    const user = await requireAdmin(supabase);
+    if (!user) return NextResponse.json({ exito: false, error: 'Acceso denegado' }, { status: 403 });
+
+    // 2. Validate order ID and verify order exists
+    if (!id || typeof id !== 'string') {
+      return NextResponse.json({ exito: false, error: 'ID de pedido inválido' }, { status: 400 });
+    }
+
+    const { data: orden, error: fetchError } = await supabase
+      .from('orders')
+      .select('id, order_number')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !orden) {
+      return NextResponse.json({ exito: false, error: 'Pedido no encontrado' }, { status: 404 });
+    }
+
+    // 3. Delete exclusively-owned records first (order_items, order_internal_notes)
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('order_id', id);
+
+    if (itemsError) {
+      return NextResponse.json(
+        { exito: false, error: `Error eliminando ítems del pedido: ${itemsError.message}` },
+        { status: 500 }
+      );
+    }
+
+    const { error: notasError } = await supabase
+      .from('order_internal_notes')
+      .delete()
+      .eq('order_id', id);
+
+    if (notasError) {
+      return NextResponse.json(
+        { exito: false, error: `Error eliminando notas internas: ${notasError.message}` },
+        { status: 500 }
+      );
+    }
+
+    // 4. Nullify order_id on shared records that reference this order
+    // (coupon_redemptions, reward_transactions, promotion_redemptions, reviews)
+    // These belong to profiles/coupons/promotions — do NOT delete them.
+    const { error: couponRedemptionsError } = await supabase
+      .from('coupon_redemptions')
+      .delete()
+      .eq('order_id', id);
+
+    if (couponRedemptionsError) {
+      return NextResponse.json(
+        { exito: false, error: `Error eliminando redenciones de cupón: ${couponRedemptionsError.message}` },
+        { status: 500 }
+      );
+    }
+
+    const { error: rewardTxError } = await supabase
+      .from('reward_transactions')
+      .update({ order_id: null })
+      .eq('order_id', id);
+
+    if (rewardTxError) {
+      return NextResponse.json(
+        { exito: false, error: `Error actualizando transacciones de recompensas: ${rewardTxError.message}` },
+        { status: 500 }
+      );
+    }
+
+    const { error: promoRedemptionsError } = await supabase
+      .from('promotion_redemptions')
+      .update({ order_id: null })
+      .eq('order_id', id);
+
+    if (promoRedemptionsError) {
+      return NextResponse.json(
+        { exito: false, error: `Error actualizando redenciones de promociones: ${promoRedemptionsError.message}` },
+        { status: 500 }
+      );
+    }
+
+    const { error: reviewsError } = await supabase
+      .from('reviews')
+      .update({ order_id: null })
+      .eq('order_id', id);
+
+    if (reviewsError) {
+      return NextResponse.json(
+        { exito: false, error: `Error actualizando reseñas: ${reviewsError.message}` },
+        { status: 500 }
+      );
+    }
+
+    // 5. Delete the order itself
+    const { error: deleteError } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      return NextResponse.json(
+        { exito: false, error: `Error eliminando pedido: ${deleteError.message}` },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      exito: true,
+      mensaje: `Pedido #${orden.order_number} eliminado permanentemente`,
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { exito: false, error: err instanceof Error ? err.message : 'Error inesperado al eliminar el pedido' },
+      { status: 500 }
+    );
   }
 }
