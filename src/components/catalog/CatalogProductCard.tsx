@@ -62,15 +62,16 @@ export default function CatalogProductCard({ product, onAddToCart, country = 'CO
   const inStock = product.inventory_status?.is_in_stock !== false;
   const isLowStock = product.inventory_status?.is_low_stock;
   const available = isProductAvailableInCountry(product, country);
-  const hasDiscount = product.compare_at_price && product.compare_at_price > product.base_price;
+  const countryPrice = country === 'CR' ? product.price_crc : product.price_cop;
+  const hasDiscount = product.compare_at_price && countryPrice != null && product.compare_at_price > countryPrice;
   const discountPct = hasDiscount
-    ? Math.round((1 - product.base_price / product.compare_at_price!) * 100)
+    ? Math.round((1 - countryPrice! / product.compare_at_price!) * 100)
     : 0;
 
   const priceStr = formatPrice(product, country);
   const comparePriceStr =
     hasDiscount && country === 'CO'
-      ? formatPrice({ base_price: product.compare_at_price!, price_crc: null }, country)
+      ? formatPrice({ ...product, price_cop: product.compare_at_price ?? undefined }, 'CO')
       : null;
 
   // Add to cart state
