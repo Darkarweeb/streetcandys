@@ -61,11 +61,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .from('product_variants')
       .insert({
         product_id: id,
-        variant_type: body.variant_type,
+        variant_type: body.variant_type ?? 'size',
         name: body.name,
         value: body.value,
         sku: body.sku || null,
         price_modifier: body.price_modifier ?? 0,
+        price_cop: body.price_cop != null ? Number(body.price_cop) : null,
+        price_crc: body.price_crc != null ? Number(body.price_crc) : null,
+        weight_label: body.weight_label || null,
         is_active: body.is_active ?? true,
         sort_order: body.sort_order ?? 0,
       })

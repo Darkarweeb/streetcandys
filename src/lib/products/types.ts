@@ -70,6 +70,9 @@ export interface DbProductVariant {
   value: string;
   sku: string | null;
   price_modifier: number;
+  price_cop: number | null;
+  price_crc: number | null;
+  weight_label: string | null;
   images: ProductImage[];
   is_active: boolean;
   sort_order: number;
