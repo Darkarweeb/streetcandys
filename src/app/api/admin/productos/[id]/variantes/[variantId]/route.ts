@@ -35,6 +35,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (body.value !== undefined) updateData.value = body.value;
     if (body.sku !== undefined) updateData.sku = body.sku || null;
     if (body.price_modifier !== undefined) updateData.price_modifier = body.price_modifier;
+    if (body.price_cop !== undefined) updateData.price_cop = body.price_cop != null ? Number(body.price_cop) : null;
+    if (body.price_crc !== undefined) updateData.price_crc = body.price_crc != null ? Number(body.price_crc) : null;
+    if (body.weight_label !== undefined) updateData.weight_label = body.weight_label || null;
     if (body.is_active !== undefined) updateData.is_active = body.is_active;
     if (body.sort_order !== undefined) updateData.sort_order = body.sort_order;
     if (body.variant_type !== undefined) updateData.variant_type = body.variant_type;

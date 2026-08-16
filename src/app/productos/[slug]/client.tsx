@@ -48,6 +48,20 @@ interface CartItem {
   variant_id?: string | null;
 }
 
+// Extended variant type with presentation fields
+interface PresentacionVariant {
+  id: string;
+  name: string;
+  value: string;
+  weight_label?: string | null;
+  price_cop?: number | null;
+  price_crc?: number | null;
+  price_modifier: number;
+  is_active: boolean;
+  is_in_stock?: boolean;
+  sort_order: number;
+}
+
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function ProductDetailSkeleton() {
@@ -138,6 +152,7 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [country, setCountry] = useState<Country>('CO');
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [presentationError, setPresentationError] = useState(false);
   const reviewsRef = useRef<HTMLDivElement>(null);
 
   const { settings: waSettings, loading: waLoading } = useWhatsAppSettings();
@@ -176,11 +191,17 @@ export default function ProductDetailPage() {
 
         const loadedProduct: ProductWithDetails = productData.datos;
         setProduct(loadedProduct);
-        // Pre-select first in-stock variant if variants exist
-        if (loadedProduct.variants && loadedProduct.variants.length > 0) {
-          const firstInStock = loadedProduct.variants.find(v => v.is_in_stock !== false) ?? loadedProduct.variants[0];
-          setSelectedVariantId(firstInStock.id);
+
+        // For products with presentations: do NOT pre-select — require explicit choice
+        // For products without presentations: no variant needed
+        const activePresentations = (loadedProduct.variants || []).filter(
+          (v) => v.is_active !== false
+        );
+        if (activePresentations.length > 0) {
+          // Don't pre-select — customer must choose
+          setSelectedVariantId(null);
         }
+
         setRelatedProducts(relatedData.datos || []);
         if (reviewsData.exito) {
           setReviews(reviewsData.datos?.reviews || []);
@@ -198,6 +219,14 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = async () => {
     if (!product) return;
+
+    // If product has active presentations, a selection is required
+    const activePresentations = (product.variants || []).filter((v) => v.is_active !== false);
+    if (activePresentations.length > 0 && !selectedVariantId) {
+      setPresentationError(true);
+      return;
+    }
+    setPresentationError(false);
 
     try {
       const sessionId = getOrCreateSessionId();
@@ -227,7 +256,6 @@ export default function ProductDetailPage() {
           cantidad: number;
         }) => ({
           id: item.id,
-          // Store product_id and variant_id so checkout can sync to Supabase correctly
           product_id: item.product_id ?? product.id,
           variant_id: item.variant_id ?? null,
           name: item.producto?.nombre ?? '',
@@ -250,40 +278,60 @@ export default function ProductDetailPage() {
   const mainImage = product.images?.[selectedImage]?.url || product.images?.[0]?.url || product.thumbnail_url;
   const mainAlt = product.images?.[selectedImage]?.alt || product.images?.[0]?.alt || product.name;
 
-  // Resolve active variant
-  const hasVariants = product.variants && product.variants.length > 0;
-  const activeVariant = hasVariants
-    ? product.variants!.find(v => v.id === selectedVariantId) ?? product.variants![0]
+  // Determine if product has active presentations
+  const activePresentations = (product.variants || []).filter(
+    (v) => v.is_active !== false
+  ) as PresentacionVariant[];
+  const hasPresentations = activePresentations.length > 0;
+
+  // Find selected presentation
+  const selectedPresentation = hasPresentations && selectedVariantId
+    ? activePresentations.find((v) => v.id === selectedVariantId) ?? null
     : null;
 
-  const inStock = activeVariant
-    ? activeVariant.is_in_stock !== false
-    : product.inventory_status?.is_in_stock !== false;
+  // Resolve displayed price
+  let priceStr: string;
+  if (hasPresentations) {
+    if (!selectedPresentation) {
+      priceStr = 'Selecciona una presentación';
+    } else {
+      const variantPrice = country === 'CR'
+        ? selectedPresentation.price_crc
+        : selectedPresentation.price_cop;
+      if (variantPrice != null) {
+        priceStr = formatPriceValue(variantPrice, country);
+      } else {
+        priceStr = 'Precio no disponible';
+      }
+    }
+  } else {
+    // No presentations — use product-level price
+    priceStr = country === 'CR'
+      ? (product.price_crc != null ? formatPriceValue(product.price_crc, 'CR') : 'Precio no disponible')
+      : (product.price_cop != null ? formatPriceValue(product.price_cop, 'CO') : 'Precio no disponible');
+  }
+
   const hasDiscount = product.compare_at_price && product.compare_at_price > (product.price_cop ?? 0);
   const discountPct = hasDiscount ? Math.round((1 - (product.price_cop ?? 0) / product.compare_at_price!) * 100) : 0;
-
-  // Country-aware price — use price_cop for CO, price_crc for CR
-  // Apply variant price_modifier if a variant is selected
-  const variantModifier = activeVariant?.price_modifier ?? 0;
-  const coPrice = product.price_cop ?? null; // no base_price fallback
-  const priceStr = country === 'CR'
-    ? (product.price_crc != null
-        ? formatPriceValue(product.price_crc + variantModifier, 'CR')
-        : 'Precio no disponible')
-    : (coPrice != null
-        ? formatPriceValue(coPrice + variantModifier, 'CO')
-        : 'Precio no disponible');
-  const comparePriceStr = hasDiscount && country === 'CO'
+  const comparePriceStr = hasDiscount && country === 'CO' && !hasPresentations
     ? formatPriceValue(product.compare_at_price!, 'CO')
     : null;
 
-  // WhatsApp message uses active country currency
+  // Stock: if presentation selected, check its stock; otherwise product stock
+  const inStock = selectedPresentation
+    ? selectedPresentation.is_in_stock !== false
+    : !hasPresentations
+      ? product.inventory_status?.is_in_stock !== false
+      : true; // no selection yet — don't show out of stock
+
+  // WhatsApp message
   const buildWaMessage = () => {
     const productUrl = `${window.location.origin}/productos/${slug}`;
-    const variantInfo = product.sku ? ` (SKU: ${product.sku})` : '';
-    const priceFormatted = priceStr;
+    const presentationInfo = selectedPresentation
+      ? ` — ${selectedPresentation.name}${selectedPresentation.weight_label ? ' · ' + selectedPresentation.weight_label : ''}`
+      : '';
     return (
-      `Hola 👋, quiero comprar:\n\n🍬 *${product.name}*${variantInfo}\n📦 Cantidad: ${quantity}\n💰 Precio unitario: ${priceFormatted}\n\n🔗 ${productUrl}` +
+      `Hola 👋, quiero comprar:\n\n🍬 *${product.name}*${presentationInfo}\n📦 Cantidad: ${quantity}\n💰 Precio unitario: ${priceStr}\n\n🔗 ${productUrl}` +
       `\n\n💳 Pago con cripto (BTC, ETH, USDT, USDC) disponible bajo solicitud por este chat.`
     );
   };
@@ -364,16 +412,16 @@ export default function ProductDetailPage() {
               {/* Rating */}
               {reviewsSummary && (
                 <div className="flex items-center gap-3 mb-6">
-                  <StarRating rating={reviewsSummary.average_rating} />
+                  <StarRating rating={(reviewsSummary as { average_rating: number }).average_rating} />
                   <span className="text-sm text-sc-muted">
-                    {reviewsSummary.total_reviews} reseñas
+                    {(reviewsSummary as { total_reviews: number }).total_reviews} reseñas
                   </span>
                 </div>
               )}
 
               {/* Price */}
               <div className="flex items-baseline gap-3 mb-6">
-                <span className="text-3xl font-black text-sc-forest">
+                <span className={`text-3xl font-black ${priceStr === 'Selecciona una presentación' ? 'text-sc-muted text-xl' : 'text-sc-forest'}`}>
                   {priceStr}
                 </span>
                 {comparePriceStr && (
@@ -389,53 +437,94 @@ export default function ProductDetailPage() {
               </div>
 
               {/* Stock Status */}
-              <div className="mb-6">
-                {inStock ? (
-                  <span className="text-sm font-semibold text-green-600">En stock</span>
-                ) : (
-                  <span className="text-sm font-semibold text-red-600">Agotado</span>
-                )}
-              </div>
+              {!hasPresentations && (
+                <div className="mb-6">
+                  {inStock ? (
+                    <span className="text-sm font-semibold text-green-600">En stock</span>
+                  ) : (
+                    <span className="text-sm font-semibold text-red-600">Agotado</span>
+                  )}
+                </div>
+              )}
 
-              {/* Variant Selector */}
-              {hasVariants && (
+              {/* Presentation Selector */}
+              {hasPresentations && (
                 <div className="mb-6">
                   <p className="text-sm font-semibold text-sc-forest mb-3">
-                    {product.variants![0].variant_type === 'size' && 'Tamaño'}
-                    {product.variants![0].variant_type === 'flavor' && 'Sabor'}
-                    {product.variants![0].variant_type === 'strength' && 'Intensidad'}
-                    {product.variants![0].variant_type === 'format' && 'Formato'}
-                    {!['size', 'flavor', 'strength', 'format'].includes(product.variants![0].variant_type) && 'Variante'}
+                    Selecciona una presentación
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {product.variants!.map((variant) => {
-                      const isSelected = variant.id === selectedVariantId;
-                      const outOfStock = variant.is_in_stock === false;
+                  <div className="space-y-2">
+                    {activePresentations.map((v) => {
+                      const isSelected = v.id === selectedVariantId;
+                      const outOfStock = v.is_in_stock === false;
+                      const variantPrice = country === 'CR' ? v.price_crc : v.price_cop;
+                      const variantPriceStr = variantPrice != null
+                        ? formatPriceValue(variantPrice, country)
+                        : 'Precio no disponible';
+
                       return (
                         <button
-                          key={variant.id}
-                          onClick={() => !outOfStock && setSelectedVariantId(variant.id)}
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            if (!outOfStock) {
+                              setSelectedVariantId(v.id);
+                              setPresentationError(false);
+                            }
+                          }}
                           disabled={outOfStock}
-                          className={`px-4 py-2 rounded-pill text-sm font-semibold border-2 transition-all ${
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left ${
                             isSelected
-                              ? 'bg-sc-forest text-sc-cream border-sc-forest'
+                              ? 'border-sc-forest bg-sc-forest/5'
                               : outOfStock
-                              ? 'bg-sc-beige text-sc-muted border-sc-border cursor-not-allowed line-through' :'bg-transparent text-sc-forest border-sc-border hover:border-sc-forest'
+                              ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed' :'border-sc-border hover:border-sc-forest/50 bg-white'
                           }`}
                           aria-pressed={isSelected}
-                          aria-label={`${variant.name}: ${variant.value}${outOfStock ? ' (agotado)' : ''}`}
                         >
-                          {variant.value}
-                          {variant.price_modifier !== 0 && variant.price_modifier != null && (
-                            <span className="ml-1 text-xs opacity-70">
-                              {variant.price_modifier > 0 ? '+' : ''}
-                              {formatPriceValue(variant.price_modifier, country)}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-3">
+                            {/* Radio indicator */}
+                            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                              isSelected ? 'border-sc-forest' : 'border-gray-300'
+                            }`}>
+                              {isSelected && <div className="w-2 h-2 rounded-full bg-sc-forest" />}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-sm text-sc-forest">
+                                {v.name}
+                              </span>
+                              {v.weight_label && (
+                                <span className="text-xs text-gray-500 ml-2">· {v.weight_label}</span>
+                              )}
+                              {outOfStock && (
+                                <span className="text-xs text-red-500 ml-2">Agotado</span>
+                              )}
+                            </div>
+                          </div>
+                          <span className={`text-sm font-bold flex-shrink-0 ${isSelected ? 'text-sc-forest' : 'text-sc-forest/70'}`}>
+                            {variantPriceStr}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
+
+                  {/* Stock status for selected presentation */}
+                  {selectedPresentation && (
+                    <div className="mt-3">
+                      {selectedPresentation.is_in_stock !== false ? (
+                        <span className="text-sm font-semibold text-green-600">En stock</span>
+                      ) : (
+                        <span className="text-sm font-semibold text-red-600">Agotado</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Validation error */}
+                  {presentationError && (
+                    <p className="mt-2 text-sm text-red-600 font-medium">
+                      Por favor selecciona una presentación antes de agregar al carrito.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -489,10 +578,17 @@ export default function ProductDetailPage() {
                 </div>
                 <button
                   onClick={handleAddToCart}
-                  disabled={!inStock}
-                  className="flex-1 bg-sc-forest text-sc-cream font-bold py-3 px-6 rounded-pill hover:bg-sc-darkforest transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[52px]"
+                  disabled={hasPresentations ? false : !inStock}
+                  className={`flex-1 font-bold py-3 px-6 rounded-pill transition-colors min-h-[52px] ${
+                    (!hasPresentations && !inStock)
+                      ? 'bg-sc-forest/40 text-sc-cream cursor-not-allowed'
+                      : 'bg-sc-forest text-sc-cream hover:bg-sc-darkforest'
+                  }`}
                 >
-                  {inStock ? 'Añadir al carrito' : 'Agotado'}
+                  {!hasPresentations && !inStock
+                    ? 'Agotado'
+                    : hasPresentations && !selectedVariantId
+                    ? 'Selecciona una presentación' :'Añadir al carrito'}
                 </button>
               </div>
 
@@ -530,7 +626,7 @@ export default function ProductDetailPage() {
         </div>
 
         {/* Reviews Section */}
-        <div id="reviews">
+        <div id="reviews" ref={reviewsRef}>
           <ProductReviewsSection
             productSlug={slug}
             productId={product.id}

@@ -12,16 +12,14 @@ interface ProductImage {
   position: number;
 }
 
-interface VariantForm {
+interface PresentacionForm {
   id?: string;
-  variant_type: 'size' | 'flavor' | 'strength' | 'format';
-  name: string;
-  value: string;
-  sku: string;
-  price_modifier: string;
+  name: string;        // e.g. "1/8 oz"
+  weight_label: string; // e.g. "3.5 g"
+  price_cop: string;
+  price_crc: string;
   is_active: boolean;
-  quantity: string;
-  low_stock_threshold: string;
+  sort_order: number;
 }
 
 interface InventoryData {
@@ -64,6 +62,10 @@ const FORM_INICIAL: ProductFormData = {
   is_active: true, is_featured: false, requires_age_verification: true,
   tags: '', effects: '', intensity_level: '', origin_country: 'CO',
   weight_grams: '', meta_title: '', meta_description: '', coa_url: '',
+};
+
+const PRESENTACION_VACIA: PresentacionForm = {
+  name: '', weight_label: '', price_cop: '', price_crc: '', is_active: true, sort_order: 0,
 };
 
 function slugify(text: string) {
@@ -121,7 +123,6 @@ function ImageManager({
 
   const handleRemove = async (idx: number) => {
     const img = images[idx];
-    // Try to delete from storage
     if (img.url.includes('product-images')) {
       try {
         await fetch('/api/admin/productos/delete-image', {
@@ -239,41 +240,75 @@ function ImageManager({
   );
 }
 
-// ─── Variant Manager ──────────────────────────────────────────
-function VariantManager({
+// ─── Presentaciones Manager ───────────────────────────────────
+function PresentacionesManager({
   productId,
-  variants,
+  presentaciones,
   onRefresh,
 }: {
   productId: string;
-  variants: VariantForm[];
+  presentaciones: PresentacionForm[];
   onRefresh: () => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [newVariant, setNewVariant] = useState<VariantForm>({
-    variant_type: 'size', name: '', value: '', sku: '',
-    price_modifier: '0', is_active: true, quantity: '0', low_stock_threshold: '5',
-  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<PresentacionForm>(PRESENTACION_VACIA);
+  const [newPresentacion, setNewPresentacion] = useState<PresentacionForm>({ ...PRESENTACION_VACIA });
 
   const handleAdd = async () => {
-    if (!newVariant.name || !newVariant.value) return;
+    if (!newPresentacion.name.trim()) return;
     setSaving(true);
     try {
       let res = await fetch(`/api/admin/productos/${productId}/variantes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...newVariant,
-          price_modifier: Number(newVariant.price_modifier) || 0,
-          quantity: Number(newVariant.quantity) || 0,
-          low_stock_threshold: Number(newVariant.low_stock_threshold) || 5,
+          variant_type: 'size',
+          name: newPresentacion.name,
+          value: newPresentacion.name,
+          weight_label: newPresentacion.weight_label || null,
+          price_cop: newPresentacion.price_cop ? Number(newPresentacion.price_cop) : null,
+          price_crc: newPresentacion.price_crc ? Number(newPresentacion.price_crc) : null,
+          is_active: newPresentacion.is_active,
+          sort_order: presentaciones.length,
+          price_modifier: 0,
         }),
       });
       const data = await res.json();
       if (data.exito) {
         setAdding(false);
-        setNewVariant({ variant_type: 'size', name: '', value: '', sku: '', price_modifier: '0', is_active: true, quantity: '0', low_stock_threshold: '5' });
+        setNewPresentacion({ ...PRESENTACION_VACIA });
+        onRefresh();
+      }
+    } catch { /* silent */ }
+    setSaving(false);
+  };
+
+  const handleStartEdit = (p: PresentacionForm) => {
+    setEditingId(p.id ?? null);
+    setEditForm({ ...p });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    try {
+      let res = await fetch(`/api/admin/productos/${productId}/variantes/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name,
+          value: editForm.name,
+          weight_label: editForm.weight_label || null,
+          price_cop: editForm.price_cop ? Number(editForm.price_cop) : null,
+          price_crc: editForm.price_crc ? Number(editForm.price_crc) : null,
+          is_active: editForm.is_active,
+        }),
+      });
+      const data = await res.json();
+      if (data.exito) {
+        setEditingId(null);
         onRefresh();
       }
     } catch { /* silent */ }
@@ -281,7 +316,7 @@ function VariantManager({
   };
 
   const handleDelete = async (variantId: string) => {
-    if (!confirm('¿Eliminar esta variante?')) return;
+    if (!confirm('¿Eliminar esta presentación?')) return;
     await fetch(`/api/admin/productos/${productId}/variantes/${variantId}`, { method: 'DELETE' });
     onRefresh();
   };
@@ -295,150 +330,258 @@ function VariantManager({
     onRefresh();
   };
 
-  const variantTypeLabels: Record<string, string> = {
-    size: 'Tamaño', flavor: 'Sabor', strength: 'Potencia', format: 'Formato',
+  const handleMoveUp = async (idx: number) => {
+    if (idx === 0) return;
+    const a = presentaciones[idx];
+    const b = presentaciones[idx - 1];
+    if (!a.id || !b.id) return;
+    await Promise.all([
+      fetch(`/api/admin/productos/${productId}/variantes/${a.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sort_order: idx - 1 }),
+      }),
+      fetch(`/api/admin/productos/${productId}/variantes/${b.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sort_order: idx }),
+      }),
+    ]);
+    onRefresh();
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <label className="block text-sm font-medium text-sc-forest">Variantes del producto</label>
+        <div>
+          <h3 className="text-sm font-semibold text-sc-forest">PRESENTACIONES</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Cada presentación tiene su propio precio COP y CRC</p>
+        </div>
         <button
           type="button"
-          onClick={() => setAdding(!adding)}
+          onClick={() => { setAdding(!adding); setNewPresentacion({ ...PRESENTACION_VACIA }); }}
           className="text-xs bg-sc-forest text-white px-3 py-1.5 rounded-lg hover:bg-sc-darkforest transition-colors flex items-center gap-1.5"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          Agregar variante
+          + Agregar presentación
         </button>
       </div>
 
-      {variants.length > 0 && (
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Tipo</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Nombre</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Valor</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">SKU</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">+Precio</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Estado</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {variants.map((v) => (
-                <tr key={v.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-600">{variantTypeLabels[v.variant_type] || v.variant_type}</td>
-                  <td className="px-3 py-2 font-medium text-sc-forest">{v.name}</td>
-                  <td className="px-3 py-2 text-gray-600">{v.value}</td>
-                  <td className="px-3 py-2 text-gray-400 text-xs">{v.sku || '—'}</td>
-                  <td className="px-3 py-2 text-gray-600">{v.price_modifier > 0 ? `+$${v.price_modifier}` : v.price_modifier < 0 ? `-$${Math.abs(Number(v.price_modifier))}` : '—'}</td>
-                  <td className="px-3 py-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${v.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {v.is_active ? 'Activa' : 'Inactiva'}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => v.id && handleToggleActive(v.id, v.is_active)}
-                        className="p-1 text-gray-400 hover:text-sc-forest rounded transition-colors"
-                        title={v.is_active ? 'Desactivar' : 'Activar'}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                          <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2"/>
-                          {v.is_active && <circle cx="7" cy="7" r="2.5" fill="currentColor"/>}
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => v.id && handleDelete(v.id)}
-                        className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors"
-                        title="Eliminar"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                          <path d="M2 3.5h10M4.5 3.5V2.5h5v1M5 6v4M9 6v4M3 3.5l.5 8h7l.5-8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
+      {/* Existing presentations */}
+      {presentaciones.length > 0 && (
+        <div className="space-y-2">
+          {presentaciones.map((p, idx) => (
+            <div key={p.id} className={`border rounded-xl overflow-hidden ${p.is_active ? 'border-gray-200' : 'border-gray-100 opacity-60'}`}>
+              {editingId === p.id ? (
+                /* Edit mode */
+                <div className="p-4 bg-sc-beige/20 space-y-3">
+                  <p className="text-xs font-semibold text-sc-forest uppercase tracking-wide">Editando presentación</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Nombre *</label>
+                      <input
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="ej. 1/8 oz"
+                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
+                      />
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Peso / Cantidad</label>
+                      <input
+                        value={editForm.weight_label}
+                        onChange={(e) => setEditForm((f) => ({ ...f, weight_label: e.target.value }))}
+                        placeholder="ej. 3.5 g"
+                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Precio Colombia (COP)</label>
+                      <input
+                        type="number"
+                        value={editForm.price_cop}
+                        onChange={(e) => setEditForm((f) => ({ ...f, price_cop: e.target.value }))}
+                        placeholder="0"
+                        min="0"
+                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Precio Costa Rica (CRC)</label>
+                      <input
+                        type="number"
+                        value={editForm.price_crc}
+                        onChange={(e) => setEditForm((f) => ({ ...f, price_crc: e.target.value }))}
+                        placeholder="0"
+                        min="0"
+                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
+                      />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editForm.is_active}
+                      onChange={(e) => setEditForm((f) => ({ ...f, is_active: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300 text-sc-forest"
+                    />
+                    <span className="text-sm text-sc-forest">Activa</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(null)}
+                      className="flex-1 border border-gray-300 text-sc-forest rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveEdit}
+                      disabled={saving || !editForm.name.trim()}
+                      className="flex-1 bg-sc-forest text-white rounded-lg py-2 text-sm hover:bg-sc-darkforest transition-colors disabled:opacity-60"
+                    >
+                      {saving ? 'Guardando...' : 'Guardar'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* View mode */
+                <div className="flex items-center gap-3 px-4 py-3">
+                  {/* Reorder */}
+                  <button
+                    type="button"
+                    onClick={() => handleMoveUp(idx)}
+                    disabled={idx === 0}
+                    className="p-1 text-gray-300 hover:text-gray-500 disabled:opacity-20 transition-colors flex-shrink-0"
+                    title="Mover arriba"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 9V3M3 6l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm text-sc-forest">{p.name}</span>
+                      {p.weight_label && (
+                        <span className="text-xs text-gray-500">· {p.weight_label}</span>
+                      )}
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${p.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {p.is_active ? 'Activa' : 'Inactiva'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 mt-1 flex-wrap">
+                      {p.price_cop ? (
+                        <span className="text-xs text-gray-600">
+                          <span className="font-medium text-sc-forest">CO:</span> ${Number(p.price_cop).toLocaleString('es-CO')} COP
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">CO: sin precio</span>
+                      )}
+                      {p.price_crc ? (
+                        <span className="text-xs text-gray-600">
+                          <span className="font-medium text-sc-forest">CR:</span> ₡{Number(p.price_crc).toLocaleString('es-CR')} CRC
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">CR: sin precio</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleStartEdit(p)}
+                      className="p-1.5 text-gray-400 hover:text-sc-forest rounded transition-colors"
+                      title="Editar"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => p.id && handleToggleActive(p.id, p.is_active)}
+                      className="p-1.5 text-gray-400 hover:text-sc-forest rounded transition-colors"
+                      title={p.is_active ? 'Desactivar' : 'Activar'}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2"/>
+                        {p.is_active && <circle cx="7" cy="7" r="2.5" fill="currentColor"/>}
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => p.id && handleDelete(p.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 rounded transition-colors"
+                      title="Eliminar"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M2 3.5h10M4.5 3.5V2.5h5v1M5 6v4M9 6v4M3 3.5l.5 8h7l.5-8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
+      {/* Add new presentation form */}
       {adding && (
         <div className="border border-sc-forest/20 rounded-xl p-4 bg-sc-beige/20 space-y-3">
-          <p className="text-sm font-medium text-sc-forest">Nueva variante</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Tipo</label>
-              <select
-                value={newVariant.variant_type}
-                onChange={(e) => setNewVariant((p) => ({ ...p, variant_type: e.target.value as VariantForm['variant_type'] }))}
-                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
-              >
-                <option value="size">Tamaño</option>
-                <option value="flavor">Sabor</option>
-                <option value="strength">Potencia</option>
-                <option value="format">Formato</option>
-              </select>
-            </div>
+          <p className="text-sm font-semibold text-sc-forest">Nueva presentación</p>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-600 mb-1">Nombre *</label>
               <input
-                value={newVariant.name}
-                onChange={(e) => setNewVariant((p) => ({ ...p, name: e.target.value }))}
-                placeholder="ej. Tamaño"
+                value={newPresentacion.name}
+                onChange={(e) => setNewPresentacion((p) => ({ ...p, name: e.target.value }))}
+                placeholder="ej. 1/8 oz"
                 className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Valor *</label>
+              <label className="block text-xs text-gray-600 mb-1">Peso / Cantidad</label>
               <input
-                value={newVariant.value}
-                onChange={(e) => setNewVariant((p) => ({ ...p, value: e.target.value }))}
-                placeholder="ej. 3.5g"
+                value={newPresentacion.weight_label}
+                onChange={(e) => setNewPresentacion((p) => ({ ...p, weight_label: e.target.value }))}
+                placeholder="ej. 3.5 g"
                 className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-600 mb-1">SKU</label>
-              <input
-                value={newVariant.sku}
-                onChange={(e) => setNewVariant((p) => ({ ...p, sku: e.target.value }))}
-                placeholder="SKU-001-S"
-                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Modificador precio</label>
+              <label className="block text-xs text-gray-600 mb-1">Precio Colombia (COP)</label>
               <input
                 type="number"
-                value={newVariant.price_modifier}
-                onChange={(e) => setNewVariant((p) => ({ ...p, price_modifier: e.target.value }))}
+                value={newPresentacion.price_cop}
+                onChange={(e) => setNewPresentacion((p) => ({ ...p, price_cop: e.target.value }))}
                 placeholder="0"
-                step="0.01"
+                min="0"
                 className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Stock inicial</label>
+              <label className="block text-xs text-gray-600 mb-1">Precio Costa Rica (CRC)</label>
               <input
                 type="number"
-                value={newVariant.quantity}
-                onChange={(e) => setNewVariant((p) => ({ ...p, quantity: e.target.value }))}
+                value={newPresentacion.price_crc}
+                onChange={(e) => setNewPresentacion((p) => ({ ...p, price_crc: e.target.value }))}
                 placeholder="0"
                 min="0"
                 className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sc-forest/30"
               />
             </div>
           </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={newPresentacion.is_active}
+              onChange={(e) => setNewPresentacion((p) => ({ ...p, is_active: e.target.checked }))}
+              className="w-4 h-4 rounded border-gray-300 text-sc-forest"
+            />
+            <span className="text-sm text-sc-forest">Activa</span>
+          </label>
           <div className="flex gap-2">
             <button
               type="button"
@@ -450,7 +593,7 @@ function VariantManager({
             <button
               type="button"
               onClick={handleAdd}
-              disabled={saving || !newVariant.name || !newVariant.value}
+              disabled={saving || !newPresentacion.name.trim()}
               className="flex-1 bg-sc-forest text-white rounded-lg py-2 text-sm hover:bg-sc-darkforest transition-colors disabled:opacity-60"
             >
               {saving ? 'Guardando...' : 'Agregar'}
@@ -459,10 +602,11 @@ function VariantManager({
         </div>
       )}
 
-      {variants.length === 0 && !adding && (
-        <p className="text-gray-400 text-sm text-center py-4 border border-dashed border-gray-200 rounded-xl">
-          Sin variantes. Agrega tamaños, sabores u otras opciones.
-        </p>
+      {presentaciones.length === 0 && !adding && (
+        <div className="text-center py-6 border border-dashed border-gray-200 rounded-xl">
+          <p className="text-gray-400 text-sm">Sin presentaciones.</p>
+          <p className="text-gray-300 text-xs mt-1">Agrega presentaciones con precios específicos por país.</p>
+        </div>
       )}
     </div>
   );
@@ -545,7 +689,6 @@ function InventoryPanel({
         </div>
       </div>
 
-      {/* Stock status badge */}
       <div className="flex items-center gap-3">
         {isOutOfStock ? (
           <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-red-100 text-red-700 font-medium">
@@ -601,12 +744,12 @@ export default function AdminProductoEditPage() {
   const [form, setForm] = useState<ProductFormData>(FORM_INICIAL);
   const [images, setImages] = useState<ProductImage[]>([]);
   const [inventory, setInventory] = useState<InventoryData | null>(null);
-  const [variants, setVariants] = useState<VariantForm[]>([]);
+  const [presentaciones, setPresentaciones] = useState<PresentacionForm[]>([]);
   const [categorias, setCategorias] = useState<DbCategory[]>([]);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'imagenes' | 'inventario' | 'variantes' | 'seo'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'imagenes' | 'inventario' | 'presentaciones' | 'seo'>('general');
 
   useEffect(() => {
     if (!authLoading && profile && !['admin', 'staff'].includes(profile.role)) {
@@ -666,7 +809,6 @@ export default function AdminProductoEditPage() {
           coa_url: p.coa_url || '',
         });
         setImages(Array.isArray(p.images) ? p.images : []);
-        // Get base inventory (no variant)
         const baseInv = (p.inventory || []).find((i: { variant_id: string | null }) => !i.variant_id);
         if (baseInv) {
           setInventory({
@@ -675,16 +817,15 @@ export default function AdminProductoEditPage() {
             allow_backorder: baseInv.allow_backorder,
           });
         }
-        setVariants((p.product_variants || []).map((v: Record<string, unknown>) => ({
+        // Map product_variants to PresentacionForm
+        setPresentaciones((p.product_variants || []).map((v: Record<string, unknown>) => ({
           id: v.id,
-          variant_type: v.variant_type,
-          name: v.name,
-          value: v.value,
-          sku: v.sku || '',
-          price_modifier: String(v.price_modifier || 0),
+          name: String(v.name || ''),
+          weight_label: String(v.weight_label || ''),
+          price_cop: v.price_cop != null ? String(v.price_cop) : '',
+          price_crc: v.price_crc != null ? String(v.price_crc) : '',
           is_active: v.is_active ?? true,
-          quantity: '0',
-          low_stock_threshold: '5',
+          sort_order: Number(v.sort_order ?? 0),
         })));
       }
     } catch { /* silent */ }
@@ -712,7 +853,6 @@ export default function AdminProductoEditPage() {
       return;
     }
 
-    // Validate intensity_level: must be an integer between 1 and 5
     if (form.intensity_level) {
       const intensityNum = Number(form.intensity_level);
       if (!Number.isInteger(intensityNum) || intensityNum < 1 || intensityNum > 5) {
@@ -789,7 +929,7 @@ export default function AdminProductoEditPage() {
     { id: 'general', label: 'General' },
     { id: 'imagenes', label: 'Imágenes' },
     { id: 'inventario', label: 'Inventario' },
-    { id: 'variantes', label: 'Variantes' },
+    { id: 'presentaciones', label: 'Presentaciones' },
     { id: 'seo', label: 'SEO' },
   ] as const;
 
@@ -860,6 +1000,11 @@ export default function AdminProductoEditPage() {
                   }`}
                 >
                   {tab.label}
+                  {tab.id === 'presentaciones' && presentaciones.length > 0 && (
+                    <span className="ml-1.5 text-xs bg-sc-forest/10 text-sc-forest px-1.5 py-0.5 rounded-full">
+                      {presentaciones.length}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -915,7 +1060,7 @@ export default function AdminProductoEditPage() {
                     <div>
                       <label className="block text-sm font-medium text-sc-forest mb-1">
                         Precio Costa Rica (CRC)
-                        <span className="ml-1 text-xs text-gray-400 font-normal">colones</span>
+                        <span className="ml-1 text-xs text-gray-400 font-normal">colones · fallback</span>
                       </label>
                       <input
                         type="number"
@@ -930,7 +1075,7 @@ export default function AdminProductoEditPage() {
                     <div>
                       <label className="block text-sm font-medium text-sc-forest mb-1">
                         Precio Colombia (COP)
-                        <span className="ml-1 text-xs text-gray-400 font-normal">pesos</span>
+                        <span className="ml-1 text-xs text-gray-400 font-normal">pesos · fallback</span>
                       </label>
                       <input
                         type="number"
@@ -1018,7 +1163,6 @@ export default function AdminProductoEditPage() {
                         value={form.intensity_level}
                         onChange={(e) => {
                           const val = e.target.value;
-                          // Only allow empty string or integers 1-5
                           if (val === '' || (/^\d+$/.test(val) && Number(val) >= 1 && Number(val) <= 5)) {
                             set('intensity_level', val);
                           }
@@ -1143,16 +1287,16 @@ export default function AdminProductoEditPage() {
                 )
               )}
 
-              {/* Variants Tab */}
-              {activeTab === 'variantes' && (
+              {/* Presentaciones Tab */}
+              {activeTab === 'presentaciones' && (
                 isNew ? (
                   <div className="text-center py-8 text-gray-400">
-                    <p className="text-sm">Guarda el producto primero para agregar variantes</p>
+                    <p className="text-sm">Guarda el producto primero para agregar presentaciones</p>
                   </div>
                 ) : (
-                  <VariantManager
+                  <PresentacionesManager
                     productId={productId}
-                    variants={variants}
+                    presentaciones={presentaciones}
                     onRefresh={fetchProduct}
                   />
                 )
@@ -1184,7 +1328,6 @@ export default function AdminProductoEditPage() {
                     />
                     <p className="text-gray-400 text-xs mt-1">{form.meta_description.length}/160 caracteres</p>
                   </div>
-                  {/* Preview */}
                   {(form.meta_title || form.name) && (
                     <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
                       <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wide">Vista previa en Google</p>

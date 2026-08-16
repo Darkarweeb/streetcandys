@@ -506,6 +506,8 @@ export const inventarioCarritoRepositorio = {
   /**
    * Obtiene el precio actual de un producto/variante
    * Colombia → price_cop, Costa Rica → price_crc
+   * For variants: uses variant.price_cop / variant.price_crc directly when set.
+   * Falls back to product price + price_modifier only when variant has no own price.
    */
   async obtenerPrecioProducto(
     productoId: string,
@@ -518,11 +520,20 @@ export const inventarioCarritoRepositorio = {
     if (varianteId) {
       const { data, error } = await supabase
         .from('product_variants')
-        .select(`price_modifier, products:product_id(${camposPrecio})`)
+        .select(`price_modifier, price_cop, price_crc, products:product_id(${camposPrecio})`)
         .eq('id', varianteId)
         .maybeSingle();
 
       if (error || !data) return null;
+
+      // Use variant's own country price when set (presentation pricing)
+      const variantPrice = codigoPais === 'CR'
+        ? (data as Record<string, unknown>).price_crc as number | null
+        : (data as Record<string, unknown>).price_cop as number | null;
+
+      if (variantPrice != null) return variantPrice;
+
+      // Fallback: product base price + price_modifier
       const producto = data.products as Record<string, number | null> | null;
       if (!producto) return null;
       const basePrice = producto[camposPrecio];
@@ -530,9 +541,7 @@ export const inventarioCarritoRepositorio = {
       return basePrice + (data.price_modifier ?? 0);
     } else {
       const { data, error } = await supabase
-        .from('products')
-        .select(camposPrecio)
-        .eq('id', productoId)
+        .from('products').select(camposPrecio).eq('id', productoId)
         .maybeSingle();
 
       if (error || !data) return null;

@@ -17,6 +17,7 @@ export interface WhatsAppOrderItem {
   qty: number;
   price: string; // formatted price string or raw number string
   unit_price?: number;
+  variant_name?: string | null; // presentation label e.g. "1/8 oz · 3.5 g"
 }
 
 export interface WhatsAppOrderData {
@@ -119,6 +120,10 @@ export function buildWhatsAppOrderMessage(order: WhatsAppOrderData): string {
           : parseFloat(String(item.price).replace(/[^0-9.]/g, '')) || 0;
       const lineTotal = unitPrice * item.qty;
       lines.push(`* ${item.name}`);
+      // Include presentation/variant name when present
+      if (item.variant_name) {
+        lines.push(`  Presentacion: ${item.variant_name}`);
+      }
       lines.push(`  Cantidad:    ${item.qty}`);
       lines.push(`  Precio unit: ${fmtCurrency(unitPrice, currency)}`);
       lines.push(`  Subtotal:    ${fmtCurrency(lineTotal, currency)}`);
